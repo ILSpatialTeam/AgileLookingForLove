@@ -8,6 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		D5CAE4C62FE925CB005FE5D3 /* RealityKitContent in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4C52FE925CB005FE5D3 /* RealityKitContent */; };
+		D5CAE4E92FE927BD005FE5D3 /* ILSDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4E82FE927BD005FE5D3 /* ILSDesignSystem */; };
+		D5CAE4EB2FE927BD005FE5D3 /* ILSEngine in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4EA2FE927BD005FE5D3 /* ILSEngine */; };
+		D5CAE4ED2FE927BD005FE5D3 /* ILSFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4EC2FE927BD005FE5D3 /* ILSFoundation */; };
+		D5CAE4EF2FE927BD005FE5D3 /* ILSHandTracking in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4EE2FE927BD005FE5D3 /* ILSHandTracking */; };
+		D5CAE4F12FE927BD005FE5D3 /* ILSRealityAssets in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4F02FE927BD005FE5D3 /* ILSRealityAssets */; };
+		D5CAE4F32FE927BD005FE5D3 /* ILSSpatialAudio in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4F22FE927BD005FE5D3 /* ILSSpatialAudio */; };
+		D5CAE4F52FE927BD005FE5D3 /* ILSSpatialDraw in Frameworks */ = {isa = PBXBuildFile; productRef = D5CAE4F42FE927BD005FE5D3 /* ILSSpatialDraw */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,7 +64,14 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D5CAE4ED2FE927BD005FE5D3 /* ILSFoundation in Frameworks */,
+				D5CAE4F32FE927BD005FE5D3 /* ILSSpatialAudio in Frameworks */,
+				D5CAE4F52FE927BD005FE5D3 /* ILSSpatialDraw in Frameworks */,
+				D5CAE4E92FE927BD005FE5D3 /* ILSDesignSystem in Frameworks */,
+				D5CAE4EF2FE927BD005FE5D3 /* ILSHandTracking in Frameworks */,
+				D5CAE4EB2FE927BD005FE5D3 /* ILSEngine in Frameworks */,
 				D5CAE4C62FE925CB005FE5D3 /* RealityKitContent in Frameworks */,
+				D5CAE4F12FE927BD005FE5D3 /* ILSRealityAssets in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -119,6 +133,13 @@
 			name = AgileLookingForLove;
 			packageProductDependencies = (
 				D5CAE4C52FE925CB005FE5D3 /* RealityKitContent */,
+				D5CAE4E82FE927BD005FE5D3 /* ILSDesignSystem */,
+				D5CAE4EA2FE927BD005FE5D3 /* ILSEngine */,
+				D5CAE4EC2FE927BD005FE5D3 /* ILSFoundation */,
+				D5CAE4EE2FE927BD005FE5D3 /* ILSHandTracking */,
+				D5CAE4F02FE927BD005FE5D3 /* ILSRealityAssets */,
+				D5CAE4F22FE927BD005FE5D3 /* ILSSpatialAudio */,
+				D5CAE4F42FE927BD005FE5D3 /* ILSSpatialDraw */,
 			);
 			productName = AgileLookingForLove;
 			productReference = D5CAE4C02FE925CB005FE5D3 /* AgileLookingForLove.app */;
@@ -175,6 +196,9 @@
 			);
 			mainGroup = D5CAE4B72FE925CB005FE5D3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D5CAE4C12FE925CB005FE5D3 /* Products */;
 			projectDirPath = "";
@@ -486,10 +510,56 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ratafani/ILSpatial.git";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		D5CAE4C52FE925CB005FE5D3 /* RealityKitContent */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = RealityKitContent;
+		};
+		D5CAE4E82FE927BD005FE5D3 /* ILSDesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */;
+			productName = ILSDesignSystem;
+		};
+		D5CAE4EA2FE927BD005FE5D3 /* ILSEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */;
+			productName = ILSEngine;
+		};
+		D5CAE4EC2FE927BD005FE5D3 /* ILSFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */;
+			productName = ILSFoundation;
+		};
+		D5CAE4EE2FE927BD005FE5D3 /* ILSHandTracking */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */;
+			productName = ILSHandTracking;
+		};
+		D5CAE4F02FE927BD005FE5D3 /* ILSRealityAssets */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */;
+			productName = ILSRealityAssets;
+		};
+		D5CAE4F22FE927BD005FE5D3 /* ILSSpatialAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */;
+			productName = ILSSpatialAudio;
+		};
+		D5CAE4F42FE927BD005FE5D3 /* ILSSpatialDraw */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D5CAE4E72FE927BD005FE5D3 /* XCRemoteSwiftPackageReference "ILSpatial" */;
+			productName = ILSSpatialDraw;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

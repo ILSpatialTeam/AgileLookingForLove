@@ -1,0 +1,31 @@
+# Xcode
+#
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.xcuserstate
+
+# Personal settings (Sangat penting agar tidak bentrok dengan tim lain)
+#
+xcuserdata/
+
+# Swift Package Manager
+#
+.build/
+.swiftpm/
+Packages/*/build/
+Packages/*/.build/
+
+# Reality Composer Pro
+#
+# Kita simpan project .realitycomposerpro, tapi abaikan library/data sementaranya
+Packages/*/Package.realitycomposerpro/Library/
+Packages/*/Package.realitycomposerpro/WorkspaceData/
+Packages/*/Package.realitycomposerpro/PluginData/
+
+# macOS
+#
+.DS_Store
+*.swp
+*~

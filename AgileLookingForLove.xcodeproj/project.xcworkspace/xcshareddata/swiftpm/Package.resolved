@@ -1,0 +1,15 @@
+{
+  "originHash" : "b4bb35fd2dfba879978b7b99b614dc41fd338523d225a87bace3d7aaf556bac6",
+  "pins" : [
+    {
+      "identity" : "ilspatial",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ratafani/ILSpatial.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "af9ff2dc945ecfc3c4f3c4c634a7468ecbaf3b0a"
+      }
+    }
+  ],
+  "version" : 3
+}
