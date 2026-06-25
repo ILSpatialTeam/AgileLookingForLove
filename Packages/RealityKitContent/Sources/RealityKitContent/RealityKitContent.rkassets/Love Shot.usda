@@ -43,7 +43,7 @@ def Xform "Root"
                     float noiseStrength = 0
                     token opacityOverLife = "Constant"
                     float particleAngleVariation = 0.34906584
-                    asset particleImage = @love.png@
+                    asset particleImage = @Textures/love.png@
                     double particleLifeSpan = 1
                     float particleSize = 0.1
                     float sizeMultiplierAtEndOfLifespanPower = 1
