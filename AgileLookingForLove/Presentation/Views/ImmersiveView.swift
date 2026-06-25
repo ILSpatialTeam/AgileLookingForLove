@@ -32,7 +32,14 @@ struct ImmersiveView: View {
             
             //ILDraw Package
             ILFeatureHandTrackingSetup.registerSystems()
-            ILFeatureSpatialDrawSetup.registerSystems()
+                        
+                        IsDrawingComponent.registerComponent()
+                        DrawingComponent.registerComponent()
+                        CanvasComponent.registerComponent()
+                        SharePlayReceiverComponent.registerComponent()
+                        
+                        CustomPinchGestureSystem.registerSystem()
+                        DrawingSystem.registerSystem()
             
             //Canvas Entity
             let canvas = Entity()
@@ -129,6 +136,9 @@ struct ImmersiveView: View {
             appModel.viewModel.handleThreadStroke(entityA: a, entityB: b, strokeEntity: stroke)
         }
         .task {
+            let arSession = ARKitSession()
+            _ = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
+
             try? await HandTrackingService.shared.start()
         }
     }

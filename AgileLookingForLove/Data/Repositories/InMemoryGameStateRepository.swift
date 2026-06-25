@@ -10,8 +10,8 @@ import SwiftUI
 
 @Observable
 final class InMemoryGameStateRepository: GameStateRepository {
-    private (set) var score: Int = 0
-    private (set) var currentInstructions: GameInstruction?
+    private(set) var score: Int = 0
+    private(set) var currentInstructions: GameInstruction?
     
     func addScore(_ points: Int) {
         score += points
