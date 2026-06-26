@@ -34,6 +34,10 @@ final class GameViewModel {
     
     private var content: RealityViewContent?
     
+    // Persistent root entity added synchronously to RealityView.
+    // All async entity additions use addChild() on this root to avoid closed-transaction errors.
+    var rootEntity: Entity?
+    
     var firstSelectedEntity: Entity?
     private var canvasEntity: Entity?
     
@@ -43,14 +47,23 @@ final class GameViewModel {
     
     private var activeEntities: [Entity] = []
     private let maxEntitiesCount: Int = 8
+    private var spawnTimer: Double = 0.0
+    private let spawnInterval: Double = 5.0
+    private let maxSpawnedEntities = 6
     
     var shapeTemplates: [ShapeKind: Entity] = [:]
+    var shapeCenterOffsets: [ShapeKind: SIMD3<Float>] = [:]
+    private var isSessionRestored = false
     
     func loadTemplates() async {
         do {
             let sphereTemplate = try await Entity(named: "Animation/bundar_walk_anim", in: realityKitContentBundle)
             let cubeTemplate = try await Entity(named: "Animation/kotak_walk_anim", in: realityKitContentBundle)
             let pyramidTemplate = try await Entity(named: "Animation/segitiga_walk_anim", in: realityKitContentBundle)
+            
+            setupTemplateCollision(sphereTemplate, for: .sphere)
+            setupTemplateCollision(cubeTemplate, for: .cube)
+            setupTemplateCollision(pyramidTemplate, for: .pyramid)
             
             shapeTemplates[.sphere] = sphereTemplate
             shapeTemplates[.cube] = cubeTemplate
@@ -60,6 +73,31 @@ final class GameViewModel {
         } catch {
             print("[GameViewModel] Error loading templates: \(error)")
         }
+    }
+    
+    private func setupTemplateCollision(_ entity: Entity, for kind: ShapeKind) {
+        var bounds = entity.computeAccumulatedBounds(relativeTo: entity)
+        if bounds.isEmpty || (bounds.extents.x < 0.05 && bounds.extents.z < 0.05) {
+            bounds = entity.visualBounds(relativeTo: entity)
+        }
+        
+        var extents = bounds.extents
+        var center = bounds.center
+        
+        // Fallback for templates if bounds are zero/invalid
+        if extents.x < 0.05 || extents.z < 0.05 {
+            print("[GameViewModel] Template \(kind) bounds are invalid or zero. Applying fallback dimensions.")
+            extents = SIMD3<Float>(0.3, 0.3, 0.3)
+            center = SIMD3<Float>(0.0, 0.15, 0.0) // Center at half height
+        }
+        
+        shapeCenterOffsets[kind] = center
+        
+        let boxShape = ShapeResource.generateBox(width: extents.x, height: extents.y, depth: extents.z)
+            .offsetBy(translation: center)
+        entity.components.set(CollisionComponent(shapes: [boxShape]))
+        entity.components.set(InputTargetComponent())
+        print("[GameViewModel] Setup template collision for \(kind): extents=\(extents), center=\(center)")
     }
     
     init(
@@ -84,10 +122,44 @@ final class GameViewModel {
         refreshInstruction()
     }
     
-    func setContent(_ content: RealityViewContent) {
+    func setContent(_ content: RealityViewContent, root: Entity) {
         self.content = content
+        self.rootEntity = root
+        
+        // Re-attach environment and minions to the new root entity when immersive space reopens.
+        if let env = environmentEntity {
+            if env.parent == nil {
+                root.addChild(env)
+            }
+            
+            if !isSessionRestored, !activeEntities.isEmpty, let envComp = env.components[EnvironmentComponent.self] {
+                isSessionRestored = true
+                let topY = env.position.y + envComp.topYOffset
+                for entity in activeEntities {
+                    var pos = entity.position
+                    pos.y = topY + 0.05
+                    
+                    // Temporarily remove PhysicsBodyComponent to teleport dynamic physics body
+                    let physicsBody = entity.components[PhysicsBodyComponent.self]
+                    entity.components.remove(PhysicsBodyComponent.self)
+                    entity.position = pos
+                    if let physicsBody = physicsBody {
+                        entity.components.set(physicsBody)
+                    }
+                    
+                    var motion = entity.components[PhysicsMotionComponent.self] ?? PhysicsMotionComponent()
+                    motion.linearVelocity = .zero
+                    motion.angularVelocity = .zero
+                    entity.components[PhysicsMotionComponent.self] = motion
+                }
+                print("[GameViewModel] Restored existing minions onto the environment platform.")
+            }
+        }
+        
         for entity in activeEntities {
-            content.add(entity)
+            if entity.parent == nil {
+                root.addChild(entity)
+            }
         }
     }
     
@@ -104,6 +176,20 @@ final class GameViewModel {
         instructionTimer -= delta
         score = repository.score
         if instructionTimer <= 0 { refreshInstruction() }
+        
+        // Periodic spawning logic to replace SpawnSystem (prevents duplicate spawning race conditions)
+        if environmentEntity != nil {
+            spawnTimer += delta
+            if spawnTimer >= spawnInterval {
+                spawnTimer = 0.0
+                if activeEntities.count < maxSpawnedEntities {
+                    if let env = environmentEntity {
+                        let groundY = env.position(relativeTo: nil).y
+                        spawnEntityAt(groundY: groundY)
+                    }
+                }
+            }
+        }
     }
 
     func handleShoot(entity: Entity) {
@@ -168,7 +254,12 @@ final class GameViewModel {
         entity.components[EntityStateComponent.self] = stateComp
     }
     
-    func spawnEntity(in content: RealityViewContent) {
+    func spawnEntityAt(groundY: Float) {
+        guard let root = self.rootEntity else {
+            print("[Spawning] rootEntity is nil — cannot spawn yet.")
+            return
+        }
+        
         // Enforce the max entity count limit
         guard activeEntities.count < maxEntitiesCount else {
             print("[Spawning] Maximum character limit reached (\(maxEntitiesCount)). Skipping spawn.")
@@ -176,18 +267,14 @@ final class GameViewModel {
         }
         
         let kind = ShapeKind.allCases.randomElement()!
+        print("[Spawning] Requesting spawn for shape kind: \(kind)")
         
         let entity: Entity
         if let template = shapeTemplates[kind] {
             entity = template.clone(recursive: true)
-            
-            let bounds = entity.visualBounds(relativeTo: entity)
-            let extents = bounds.extents
-            let center = bounds.center
-            
-            let boxShape = ShapeResource.generateBox(width: extents.x, height: extents.y, depth: extents.z)
-                .offsetBy(translation: center)
-            entity.components.set(CollisionComponent(shapes: [boxShape]))
+            // Remove any existing PhysicsBodyComponent from the clone; we'll add it after positioning
+            entity.components.remove(PhysicsBodyComponent.self)
+            print("[Spawning] Cloned template entity successfully.")
         } else {
             let mesh = kind.meshResource
             let color = colorFor(kind)
@@ -195,23 +282,36 @@ final class GameViewModel {
             let modelEntity = ModelEntity(mesh: mesh, materials: [material])
             modelEntity.generateCollisionShapes(recursive: false)
             entity = modelEntity
+            entity.components.set(InputTargetComponent())
+            print("[Spawning] Created fallback primitive shape entity.")
         }
         
-        entity.components.set(InputTargetComponent())
+        // Set ECS components (no physics yet)
+        let centerOffset = shapeCenterOffsets[kind] ?? .zero
+        entity.components[ShapeComponent.self] = ShapeComponent(kind: kind, localCenterOffset: centerOffset)
+        entity.components[EntityStateComponent.self] = EntityStateComponent()
         
-        // Position relative to environment if present, otherwise default to player surroundings
-        if let env = environmentEntity {
-            let envPos = env.position
-            let xOffset = Float.random(in: -1.0...1.0)
-            let zOffset = Float.random(in: -1.0...1.0)
-            entity.position = SIMD3<Float>(envPos.x + xOffset, envPos.y + 0.5, envPos.z + zOffset)
+        // Step 1: Add to scene (no physics body) so world-space APIs work
+        activeEntities.append(entity)
+        root.addChild(entity)
+        
+        // Step 2: Set world-space position at exactly groundY — the platform slab top surface is there.
+        // The entity collision box (offset from setupTemplateCollision) starts just above it.
+        let spawnY = groundY
+        if let env = environmentEntity, let envComp = env.components[EnvironmentComponent.self] {
+            let envWorldPos = env.position(relativeTo: nil)
+            let xOffset = Float.random(in: -envComp.radius * 0.6 ... envComp.radius * 0.6)
+            let zOffset = Float.random(in: -envComp.radius * 0.6 ... envComp.radius * 0.6)
+            entity.setPosition(SIMD3<Float>(envWorldPos.x + xOffset, spawnY, envWorldPos.z + zOffset), relativeTo: nil)
         } else {
             let x = Float.random(in: -1.2...1.2)
-            let y = Float.random(in: 0.4...0.8)
             let z = Float.random(in: -1.8 ... -1.0)
-            entity.position = SIMD3(x, y, z)
+            entity.setPosition(SIMD3(x, spawnY, z), relativeTo: nil)
         }
         
+        print("[Spawning] Entity at world pos \(entity.position(relativeTo: nil)). Total: \(activeEntities.count)")
+        
+        // Step 3: NOW add physics body — simulation starts from the correctly placed position
         let physicsBody = PhysicsBodyComponent(
             massProperties: .init(mass: 0.1),
             material: .default,
@@ -221,20 +321,8 @@ final class GameViewModel {
         
         if let animation = entity.availableAnimations.first {
             entity.playAnimation(animation.repeat(duration: .infinity), transitionDuration: 0.5)
+            print("[Spawning] Started default animation.")
         }
-        
-        entity.components[ShapeComponent.self] = ShapeComponent(kind: kind)
-        entity.components[EntityStateComponent.self] = EntityStateComponent()
-        
-        // Track the entity locally and add it to the scene
-        activeEntities.append(entity)
-        content.add(entity)
-    }
-
-
-    func spawnEntity() {
-        guard let content = self.content else { return }
-        spawnEntity(in: content)
     }
         
     private func colorFor(_ kind: ShapeKind) -> UIColor {
@@ -371,7 +459,22 @@ final class GameViewModel {
     }
     
     func setupPlacementIndicator() {
-        guard self.placementIndicator == nil, let content = self.content else { return }
+        guard self.environmentEntity == nil else {
+            print("[GameViewModel] Environment already exists, skipping placement indicator.")
+            return
+        }
+        guard let root = self.rootEntity else {
+            print("[GameViewModel] rootEntity not set, cannot setup placement indicator.")
+            return
+        }
+        
+        if let indicator = self.placementIndicator {
+            if indicator.parent == nil {
+                root.addChild(indicator)
+            }
+            print("[GameViewModel] Existing placement indicator added back to scene.")
+            return
+        }
         
         let indicator = ModelEntity(
             mesh: .generateSphere(radius: 0.15),
@@ -385,44 +488,132 @@ final class GameViewModel {
         indicator.generateCollisionShapes(recursive: false)
         
         self.placementIndicator = indicator
-        content.add(indicator)
-        print("[GameViewModel] Placement indicator spawned!")
+        root.addChild(indicator)
+        print("[GameViewModel] New placement indicator spawned!")
     }
     
     func createEnvironment() {
-        guard let content = self.content, let indicator = self.placementIndicator else {
-            print("[GameViewModel] Cannot create environment: content or indicator is nil")
+        guard self.environmentEntity == nil else {
+            print("[GameViewModel] Environment already exists!")
+            return
+        }
+        guard let root = self.rootEntity, let indicator = self.placementIndicator else {
+            print("[GameViewModel] Cannot create environment: rootEntity or indicator is nil")
             return
         }
         
-        let indicatorPosition = indicator.position
+        // Capture indicator world-space position before async
+        let indicatorPosition = indicator.position(relativeTo: nil)
         
         Task {
             do {
                 // Load envi.usdc from bundle (under Meshes/envi.usdc)
                 let environment = try await Entity(named: "Meshes/envi", in: realityKitContentBundle)
                 environment.name = "Environment"
-                environment.position = indicatorPosition
                 
-                // Setup physics and collisions recursively
-                environment.generateCollisionShapes(recursive: true)
+                // Add to scene first, then set world position
+                root.addChild(environment)
+                environment.setPosition(indicatorPosition, relativeTo: nil)
+                
+                // Determine XZ size from visualBounds if available, fallback to 3x3m
+                let bounds = environment.visualBounds(relativeTo: environment)
+                let useWidth: Float = bounds.extents.x > 0.5 ? bounds.extents.x : 3.0
+                let useDepth: Float = bounds.extents.z > 0.5 ? bounds.extents.z : 3.0
+                
+                print("[GameViewModel] Collider size: \(useWidth) x \(useDepth)")
+                
+                // Place collider AT the env pivot (y=0 relative to env).
+                // The indicator WAS at the platform surface — so this is exactly the right height.
+                // Thin 2cm slab. Top surface at exactly Y=0 in env-local space (= indicator placement = platform surface).
+                // offsetBy moves center to Y=-0.01 so top is at Y=0.
+                let boxShape = ShapeResource.generateBox(width: useWidth, height: 0.02, depth: useDepth)
+                    .offsetBy(translation: SIMD3<Float>(0, -0.01, 0))
+                
+                environment.components.set(CollisionComponent(shapes: [boxShape], isStatic: true))
                 environment.components.set(PhysicsBodyComponent(mode: .static))
                 
-                content.add(environment)
-                self.environmentEntity = environment
+                let wanderRadius = max(1.0, (useWidth / 2.0) - 0.2)
+                // topYOffset = 0 (top surface is at env.y = indicator.y = platform surface)
+                environment.components.set(EnvironmentComponent(radius: wanderRadius, topYOffset: 0))
                 
-                // Hide and disable placement indicator
+                self.environmentEntity = environment
                 indicator.isEnabled = false
                 
-                print("[GameViewModel] Environment created successfully at \(indicatorPosition)!")
+                print("[GameViewModel] Environment ready at \(indicatorPosition), radius=\(wanderRadius)")
                 
-                // Spawn initial minions on top of the environment
+                // Spawn AT the indicator Y — entity's collision box bottom will rest exactly on the collider surface.
+                let groundY = indicatorPosition.y
                 for _ in 0..<4 {
-                    spawnEntity()
+                    spawnEntityAt(groundY: groundY)
                 }
             } catch {
                 print("[GameViewModel] Failed to load environment: \(error)")
             }
         }
+    }
+    
+    func resetSession() {
+        self.environmentEntity = nil
+        self.placementIndicator = nil
+        self.activeEntities.removeAll()
+        self.firstSelectedEntity = nil
+        self.connectionResult = .none
+        self.lastConnectionMessage = ""
+        self.isSessionRestored = false
+        print("[GameViewModel] Session state reset successfully!")
+    }
+    
+    func prepareForReopen() {
+        self.isSessionRestored = false
+        print("[GameViewModel] Prepared session for reopening.")
+    }
+}
+
+extension Entity {
+    func computeAccumulatedBounds(relativeTo reference: Entity) -> BoundingBox {
+        var combined: BoundingBox? = nil
+        
+        if let modelComp = self.components[ModelComponent.self] {
+            let meshBounds = modelComp.mesh.bounds
+            let transform = self.transformMatrix(relativeTo: reference)
+            let localMin = meshBounds.min
+            let localMax = meshBounds.max
+            
+            let corners = [
+                SIMD3<Float>(localMin.x, localMin.y, localMin.z),
+                SIMD3<Float>(localMin.x, localMin.y, localMax.z),
+                SIMD3<Float>(localMin.x, localMax.y, localMin.z),
+                SIMD3<Float>(localMin.x, localMax.y, localMax.z),
+                SIMD3<Float>(localMax.x, localMin.y, localMin.z),
+                SIMD3<Float>(localMax.x, localMin.y, localMax.z),
+                SIMD3<Float>(localMax.x, localMax.y, localMin.z),
+                SIMD3<Float>(localMax.x, localMax.y, localMax.z)
+            ]
+            
+            for corner in corners {
+                let transformedCorner4 = transform * SIMD4<Float>(corner.x, corner.y, corner.z, 1.0)
+                let transformedCorner = SIMD3<Float>(transformedCorner4.x / transformedCorner4.w,
+                                                     transformedCorner4.y / transformedCorner4.w,
+                                                     transformedCorner4.z / transformedCorner4.w)
+                if combined == nil {
+                    combined = BoundingBox(min: transformedCorner, max: transformedCorner)
+                } else {
+                    combined!.formUnion(transformedCorner)
+                }
+            }
+        }
+        
+        for child in children {
+            let childBounds = child.computeAccumulatedBounds(relativeTo: reference)
+            if childBounds.extents.x > 0.001 || childBounds.extents.z > 0.001 {
+                if combined == nil {
+                    combined = childBounds
+                } else {
+                    combined!.formUnion(childBounds)
+                }
+            }
+        }
+        
+        return combined ?? BoundingBox(min: .zero, max: .zero)
     }
 }

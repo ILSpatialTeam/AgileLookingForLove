@@ -17,25 +17,50 @@ final class MovementSystem: System {
     func update(context: SceneUpdateContext) {
         let env = context.scene.findEntity(named: "Environment")
         let center = env?.position(relativeTo: nil) ?? SIMD3<Float>(0, 0, 0)
-        let limitRadius: Float = env != nil ? 1.5 : 4.0
-        let limitY = center.y - 0.5
+        
+        let limitRadius: Float
+        let limitY: Float
+        if let env = env, let envComp = env.components[EnvironmentComponent.self] {
+            limitRadius = envComp.radius
+            limitY = (env.position(relativeTo: nil).y + envComp.topYOffset) - 0.5
+        } else {
+            limitRadius = 4.0
+            limitY = -0.5
+        }
         
         for entity in context.entities(matching: Self.query, updatingSystemWhen: .rendering) {
             guard var stateComp = entity.components[EntityStateComponent.self] else { continue }
             
             var pos = entity.position(relativeTo: nil)
             
-            // Failsafe: if entity falls below the floor, reset it relative to center
+            // Failsafe: if entity falls below the floor, reset it relative to top surface
             if pos.y < limitY {
                 var newPos = entity.position
-                newPos.y = center.y + 0.5
+                
+                let resetY: Float
+                if let env = env, let envComp = env.components[EnvironmentComponent.self] {
+                    resetY = env.position.y + envComp.topYOffset + 0.5
+                } else {
+                    resetY = 0.5
+                }
+                
+                newPos.y = resetY
                 newPos.x = center.x + Float.random(in: -0.5...0.5)
                 newPos.z = center.z + Float.random(in: -0.5...0.5)
+                
+                // Temporarily remove PhysicsBodyComponent to teleport dynamic physics body
+                let physicsBody = entity.components[PhysicsBodyComponent.self]
+                entity.components.remove(PhysicsBodyComponent.self)
                 entity.position = newPos
+                if let physicsBody = physicsBody {
+                    entity.components.set(physicsBody)
+                }
+                
                 pos = newPos // Update local pos variable
                 
                 var motion = entity.components[PhysicsMotionComponent.self] ?? PhysicsMotionComponent()
                 motion.linearVelocity = .zero
+                motion.angularVelocity = .zero
                 entity.components[PhysicsMotionComponent.self] = motion
             }
             

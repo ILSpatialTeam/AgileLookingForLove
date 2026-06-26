@@ -26,6 +26,7 @@ struct AgileLookingForLoveApp: App {
                 }
                 .onDisappear {
                     appModel.immersiveSpaceState = .closed
+                    appModel.viewModel.prepareForReopen()
                 }
         }
         .immersionStyle(selection: .constant(.mixed), in: .mixed)

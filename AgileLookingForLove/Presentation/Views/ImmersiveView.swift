@@ -20,18 +20,17 @@ struct ImmersiveView: View {
     var body: some View {
         RealityView { (content: inout RealityViewContent, attachments: RealityViewAttachments) in
             //Systems Register
-            SpawnSystem.registerSystem()
             InstructionSystem.registerSystem()
             ThreadSystem.registerSystem()
             MovementSystem.registerSystem()
             ShapeComponent.registerComponent()
             EntityStateComponent.registerComponent()
             ThreadAnchorComponent.registerComponent()
-            OriginalMaterialsComponent.registerComponent()
             RedThreadValidationSystem.registerSystem()
             LoveBeamComponent.registerComponent()
             HeadAnchorComponent.registerComponent()
             LoveProjectileComponent.registerComponent()
+            EnvironmentComponent.registerComponent()
             
             //ILDraw Package
             ILFeatureHandTrackingSetup.registerSystems()
@@ -76,19 +75,20 @@ struct ImmersiveView: View {
             fallbackFloor.position = SIMD3<Float>(0, -0.05, 0) // top surface is at y = 0
             content.add(fallbackFloor)
             
-            appModel.viewModel.setContent(content)
-            appModel.viewModel.setupPlacementIndicator()
-            
-            // Root entity for asynchronously loaded items (bypasses inout capture restriction)
+            // Persistent root entity for all async entity additions.
+            // Must be created synchronously so rootEntity is available to the view model.
             let sceneRoot = Entity()
             sceneRoot.name = "SceneRoot"
             content.add(sceneRoot)
+            
+            appModel.viewModel.setContent(content, root: sceneRoot)
+            appModel.viewModel.setupPlacementIndicator()
             
             // Load templates and spawn initial entities once templates are ready
             Task {
                 await appModel.viewModel.loadTemplates()
                 
-                // === LOAD LOVE SHOT PARTICLE ===
+                // OAD LOVE SHOT PARTICLE
                 do {
                     let loveShot = try await Entity(named: "Love Shot", in: realityKitContentBundle)
                     loveShot.name = "LoveBeam"
@@ -105,11 +105,6 @@ struct ImmersiveView: View {
                     print("[ImmersiveView] Love Shot particle system loaded!")
                 } catch {
                     print("[ImmersiveView] Failed to load Love Shot: \(error)")
-                }
-                
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                for _ in 0..<4 {
-                    appModel.viewModel.spawnEntity()
                 }
             }
             
@@ -133,7 +128,10 @@ struct ImmersiveView: View {
             content.add(headAnchor)
             
         } update: { (content: inout RealityViewContent, attachments: RealityViewAttachments) in
-            appModel.viewModel.setContent(content)
+            // Update block: only update content reference; root is already persistent in the scene.
+            if let root = appModel.viewModel.rootEntity {
+                appModel.viewModel.setContent(content, root: root)
+            }
         } attachments: {
             Attachment(id: "HUDOverlay") {
                 HUDOverlayView(
@@ -167,7 +165,8 @@ struct ImmersiveView: View {
                 }
         )
         .onReceive(NotificationCenter.default.publisher(for: .spawnEntityRequested)) { _ in
-            appModel.viewModel.spawnEntity()
+            let groundY = appModel.viewModel.environmentEntity?.position(relativeTo: nil).y ?? 0
+            appModel.viewModel.spawnEntityAt(groundY: groundY)
         }
         .onReceive(NotificationCenter.default.publisher(for: .threadStrokeConnected)) { notif in
             guard let a = notif.userInfo?["entityA"] as? Entity,

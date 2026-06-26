@@ -2,6 +2,8 @@
 //  OriginalMaterialsComponent.swift
 //  AgileLookingForLove
 //
+//  Created by Muhammad Benny Fathurrahman on 23/06/26.
+//
 
 import RealityKit
 import UIKit
@@ -26,7 +28,7 @@ extension Entity {
         
         let indicator = ModelEntity(mesh: ringMesh, materials: [material])
         indicator.name = "StatusIndicator"
-        indicator.position = SIMD3<Float>(0, 0.002, 0) // slightly offset to prevent Z-fighting with floors
+        indicator.position = SIMD3<Float>(0, 0.006, 0) // offset to prevent clipping/Z-fighting with floors
         
         self.addChild(indicator)
     }

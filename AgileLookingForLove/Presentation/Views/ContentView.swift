@@ -20,16 +20,23 @@ struct ContentView: View {
             ToggleImmersiveSpaceButton()
             
             if appModel.immersiveSpaceState == .open {
-                Button(action: {
-                    appModel.viewModel.createEnvironment()
-                }) {
-                    Text("Create Env")
+                if appModel.viewModel.environmentEntity == nil {
+                    Button(action: {
+                        appModel.viewModel.createEnvironment()
+                    }) {
+                        Text("Create Env")
+                            .font(.headline)
+                            .padding()
+                            .frame(minWidth: 160)
+                            .background(Color.blue.opacity(0.8))
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                    }
+                } else {
+                    Text("Environment Placed")
                         .font(.headline)
                         .padding()
-                        .frame(minWidth: 160)
-                        .background(Color.blue.opacity(0.8))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .foregroundColor(.secondary)
                 }
             }
         }

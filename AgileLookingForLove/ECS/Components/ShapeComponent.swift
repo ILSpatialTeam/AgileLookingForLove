@@ -9,4 +9,5 @@ import RealityKit
 
 struct ShapeComponent: Component {
     var kind: ShapeKind
+    var localCenterOffset: SIMD3<Float> = .zero
 }
