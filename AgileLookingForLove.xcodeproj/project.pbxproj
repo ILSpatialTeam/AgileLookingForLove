@@ -256,26 +256,25 @@
 		D5CAE4DC2FE925CD005FE5D3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AgileForLove;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = AgileLookingForLove/AgileForLove.icon;
 				DEVELOPMENT_TEAM = S8QWSSL8FP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Agile for Love";
+				INFOPLIST_KEY_CFBundleDisplayName = "Agile Looking for Love";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "Hand tracking is used to visualize joints and draw connection threads.";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "World sensing is used to align the game environment with your room.";
-				INFOPLIST_KEY_UILaunchStoryboardName = AgileForLove;
+				INFOPLIST_KEY_UILaunchStoryboardName = AppIcon;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.benzab.AgileLookingForLove;
+				PRODUCT_BUNDLE_IDENTIFIER = com.BAS.AgileLookingForLove;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "xros xrsimulator";
@@ -292,26 +291,25 @@
 		D5CAE4DD2FE925CD005FE5D3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AgileForLove;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = AgileLookingForLove/AgileForLove.icon;
 				DEVELOPMENT_TEAM = S8QWSSL8FP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Agile for Love";
+				INFOPLIST_KEY_CFBundleDisplayName = "Agile Looking for Love";
 				INFOPLIST_KEY_NSHandsTrackingUsageDescription = "Hand tracking is used to visualize joints and draw connection threads.";
 				INFOPLIST_KEY_NSWorldSensingUsageDescription = "World sensing is used to align the game environment with your room.";
-				INFOPLIST_KEY_UILaunchStoryboardName = AgileForLove;
+				INFOPLIST_KEY_UILaunchStoryboardName = AppIcon;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.benzab.AgileLookingForLove;
+				PRODUCT_BUNDLE_IDENTIFIER = com.BAS.AgileLookingForLove;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "xros xrsimulator";

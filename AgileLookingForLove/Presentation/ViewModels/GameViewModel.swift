@@ -28,7 +28,7 @@ final class GameViewModel {
     private let connectEntities: ConnectEntityUseCase
     
     var gameState: GameState = .menu
-    var gameTimeLeft: Double = 30.0
+    var gameTimeLeft: Double = 50.0
     var spawnAccumulator: Double = 0.0
     let spawnInterval: Double = 5.0
     
@@ -51,7 +51,7 @@ final class GameViewModel {
     private var canvasEntity: Entity?
     
     private var activeEntities: [Entity] = []
-    private let maxEntitiesCount: Int = 8
+    private let maxEntitiesCount: Int = 20
     
     var shapeTemplates: [ShapeKind: Entity] = [:]
     
@@ -123,15 +123,24 @@ final class GameViewModel {
         spawnAccumulator += delta
         if spawnAccumulator >= spawnInterval {
             spawnAccumulator = 0.0
+            for _ in 0..<5 {
             spawnEntity()
+            }
         }
         
         // Tick global game timer
         gameTimeLeft -= delta
         if gameTimeLeft <= 0 {
             gameTimeLeft = 0
-            gameState = .gameOver(victory: score >= 100)
+            let isVictory = score >= 400
+            gameState = .gameOver(victory: score >= 400)
             clearPlayingEntities()
+            
+            if let content = self.content,
+                           let sceneRoot = content.entities.first(where: { $0.name == "SceneRoot" }) {
+                            let sound: AudioManager.SoundEffect = isVictory ? .victory : .defeat
+                            AudioManager.shared.play(sound, on: sceneRoot)
+                        }
         }
         
         score = repository.score
@@ -143,11 +152,12 @@ final class GameViewModel {
         guard stateComp.state == .idle || stateComp.state == .walking || stateComp.state == .stunned else { return }
         
         stateComp.state = .stunned
-        stateComp.stunTimer = 5.0
+        stateComp.stunTimer = 7.0
         entity.components[EntityStateComponent.self] = stateComp
         
         entity.setStatusIndicator(color: .red)
         entity.stopAllAnimations(recursive: true)
+        AudioManager.shared.play(.stunned, on: entity)
     }
     
     func handleConnect(entity: Entity) {
@@ -320,6 +330,8 @@ final class GameViewModel {
             markConnected(entityA)
             markConnected(entityB)
             
+            AudioManager.shared.play(.connect, on: entityA)
+            
             activeEntities.removeAll(where: { $0 == entityA || $0 == entityB })
             
             setColor(.systemGreen, on: entityA)
@@ -408,13 +420,13 @@ final class GameViewModel {
     private func startGamePlay() {
         clearPlayingEntities()
         gameState = .playing
-        gameTimeLeft = 30.0
+        gameTimeLeft = 50.0
         spawnAccumulator = 0.0
         repository.resetScore()
         score = 0
         
-        // Spawn initial 4 entities
-        for _ in 0..<4 {
+        // Spawn initial 10 entities
+        for _ in 0..<10 {
             spawnEntity()
         }
         

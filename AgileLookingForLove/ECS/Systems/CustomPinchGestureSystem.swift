@@ -142,7 +142,7 @@ public struct CustomPinchGestureSystem: System {
                         vfx.mainEmitter.lifeSpan = 1.5
                         vfx.mainEmitter.birthRate = 25.0
                         vfx.mainEmitter.stretchFactor = 0.0
-                        vfx.mainEmitter.acceleration = SIMD3<Float>(0, 1.5, 0)
+                        vfx.mainEmitter.acceleration = SIMD3<Float>(0, 0, 0)
                         vfx.mainEmitter.angleVariation = 0.15
                         
                         let from = SIMD3<Float>(0, 1, 0)
@@ -169,8 +169,8 @@ public struct CustomPinchGestureSystem: System {
                             } else {
                                 loveBeam.addChild(projectile)
                             }
+                            AudioManager.shared.play(.laserBeam , on: projectile)
                         }
-                        
                         emitterEntity.components.set(vfx)
                     }
                 }
@@ -206,13 +206,13 @@ public struct CustomPinchGestureSystem: System {
                 guard let stateComp = shape.components[EntityStateComponent.self],
                       (stateComp.state == .idle || stateComp.state == .walking) else { continue }
                 
-                let shapePos = shape.position(relativeTo: nil as Entity?)
+                let shapePos = shape.visualBounds(relativeTo: nil).center
                 let dist = simd_distance(projectile.position, shapePos)
                 
                 if dist < 0.4 {
                     var mutableStateComp = stateComp
                     mutableStateComp.state = .stunned
-                    mutableStateComp.stunTimer = 5.0
+                    mutableStateComp.stunTimer = 7.0
                     shape.components[EntityStateComponent.self] = mutableStateComp
                     
                     NotificationCenter.default.post(

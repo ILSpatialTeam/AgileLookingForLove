@@ -205,6 +205,7 @@ struct ImmersiveView: View {
             _ = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
             await HeadTracker.shared.start()
             try? await HandTrackingService.shared.start()
+            await AudioManager.shared.preloadAllSounds()
         }
     }
 

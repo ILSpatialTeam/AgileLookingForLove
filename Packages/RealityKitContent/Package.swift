@@ -27,6 +27,9 @@ let package = Package(
         .target(
             name: "RealityKitContent",
             dependencies: [],
+            resources: [
+                .process("Sounds")
+            ],
             swiftSettings: [
                 .enableUpcomingFeature("MemberImportVisibility")
             ]),

@@ -82,7 +82,7 @@ final class RedThreadValidationSystem: System {
                 guard stateComp.state == .stunned else { continue }
                 
                 // Use the actual position of the shape in world space
-                let visualCenter = shape.position(relativeTo: nil)
+                let visualCenter = shape.visualBounds(relativeTo: nil).center
                 let dStart = simd_distance(visualCenter, startPoint)
                 let dEnd   = simd_distance(visualCenter, endPoint)
                 
@@ -101,7 +101,6 @@ final class RedThreadValidationSystem: System {
             if let a = startEntity, let b = endEntity {
                 print("[RedThreadValidationSystem] Selected: A=\(a.name) (dist \(minStartDist)), B=\(b.name) (dist \(minEndDist))")
                 if a.id != b.id {
-                    AudioManager.shared.play(.connect, on: a)
                     print("[RedThreadValidationSystem] Posting threadStrokeConnected notification!")
                     NotificationCenter.default.post(
                         name: .threadStrokeConnected,

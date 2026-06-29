@@ -26,4 +26,6 @@ struct EntityStateComponent: Component {
         Float.random(in: -1...1)
     )
     var changeDirTimer: Double = Double.random(in: 1...3)
+    
+    var soundTimer: Double = Double.random(in: 3...8)
 }

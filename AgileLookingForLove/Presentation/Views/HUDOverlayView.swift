@@ -131,7 +131,7 @@ struct ShapeIcon: View {
             switch kind {
             case .sphere:
                 Circle()
-                    .fill(Color.red)
+                    .fill(Color.yellow)
                     .frame(width: 36, height: 36)
                     .overlay(Circle().stroke(Color.white, lineWidth: 2))
                     .shadow(radius: 2)

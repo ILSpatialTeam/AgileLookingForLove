@@ -40,6 +40,12 @@ final class MovementSystem: System {
                     stateComp.changeDirTimer = Double.random(in: 1...3)
                 }
                 
+                stateComp.soundTimer -= context.deltaTime
+                if stateComp.soundTimer <= 0 {
+                    AudioManager.shared.play(.minion, on: entity)
+                    stateComp.soundTimer = Double.random(in: 6...12)
+                }
+                
                 // max distance for the love
                 let distanceXZ = sqrt(pos.x * pos.x + pos.z * pos.z)
                 if distanceXZ > 4.0 {
