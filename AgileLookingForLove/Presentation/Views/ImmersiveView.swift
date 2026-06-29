@@ -22,8 +22,6 @@ struct ImmersiveView: View {
 
     var body: some View {
         RealityView { (content: inout RealityViewContent, attachments: RealityViewAttachments) in
-            //Systems Register
-            SpawnSystem.registerSystem()
             InstructionSystem.registerSystem()
             ThreadSystem.registerSystem()
             MovementSystem.registerSystem()
@@ -32,32 +30,34 @@ struct ImmersiveView: View {
             ThreadAnchorComponent.registerComponent()
             OriginalMaterialsComponent.registerComponent()
             RedThreadValidationSystem.registerSystem()
+            MergeAnimationComponent.registerComponent()
+            MergeAnimationSystem.registerSystem()
             LoveBeamComponent.registerComponent()
             HeadAnchorComponent.registerComponent()
             LoveProjectileComponent.registerComponent()
+            HandOverlayComponent.registerComponent()
+            HandOverlaySystem.registerSystem()
             
-            //ILDraw Package
+            // Register draw package systems
             ILFeatureHandTrackingSetup.registerSystems()
-                        
-                        IsDrawingComponent.registerComponent()
-                        DrawingComponent.registerComponent()
-                        CanvasComponent.registerComponent()
-                        SharePlayReceiverComponent.registerComponent()
-                        
-                        CustomPinchGestureSystem.registerSystem()
-                        DrawingSystem.registerSystem()
+            IsDrawingComponent.registerComponent()
+            DrawingComponent.registerComponent()
+            CanvasComponent.registerComponent()
+            SharePlayReceiverComponent.registerComponent()
             
-            //Canvas Entity
+            CustomPinchGestureSystem.registerSystem()
+            CustomDrawingSystem.registerSystem()
+            
+            // Canvas setup
             let canvas = Entity()
             canvas.name = "RedThreadCanvas"
             canvas.components.set(CanvasComponent())
             content.add(canvas)
             
-            //DrawController
+            // Draw controller setup
             let drawController = Entity()
             drawController.name = "DrawController"
             
-            //Red Strting
             var drawComp = DrawingComponent()
             drawComp.currentColor = SIMD4<Float>(0.9, 0.1, 0.1, 1.0)
             drawComp.sphereRadius = 0.004
@@ -68,20 +68,31 @@ struct ImmersiveView: View {
             content.add(drawController)
             
             let hands = HandEntitySpawner.spawnHands()
-            for hand in hands {content.add(hand)}
+            var leftHandAnchor: Entity? = nil
+            var rightHandAnchor: Entity? = nil
+            for hand in hands {
+                if hand.name == "LeftHandAnchor" {
+                    hand.components.set(HandOverlayComponent(chirality: .left))
+                    leftHandAnchor = hand
+                } else if hand.name == "RightHandAnchor" {
+                    hand.components.set(HandOverlayComponent(chirality: .right))
+                    rightHandAnchor = hand
+                }
+                content.add(hand)
+            }
             
-            // Add a fallback static floor collider so entities don't fall into the abyss before spatial tracking loads
+            // Fallback floor collider
             let fallbackFloor = Entity()
             fallbackFloor.name = "FallbackFloor"
             let floorShape = ShapeResource.generateBox(width: 50, height: 0.1, depth: 50)
             fallbackFloor.components.set(CollisionComponent(shapes: [floorShape], isStatic: true))
             fallbackFloor.components.set(PhysicsBodyComponent(mode: .static))
-            fallbackFloor.position = SIMD3<Float>(0, -0.05, 0) // top surface is at y = 0
+            fallbackFloor.position = SIMD3<Float>(0, -0.05, 0)
             content.add(fallbackFloor)
             
             appModel.viewModel.setContent(content)
             
-            // Root entity for asynchronously loaded items (bypasses inout capture restriction)
+            // Root entity for loaded items
             let sceneRoot = Entity()
             sceneRoot.name = "SceneRoot"
             content.add(sceneRoot)
@@ -95,18 +106,48 @@ struct ImmersiveView: View {
             Task {
                 await appModel.viewModel.loadTemplates()
                 
-                // === LOAD LOVE SHOT PARTICLE ===
+                // Load Glove Meshes from RealityKitContent bundle
+                do {
+                    let leftGlove = try await Entity(named: "Meshes/LeftGlove", in: realityKitContentBundle)
+                    let rightGlove = try await Entity(named: "Meshes/RightGlove", in: realityKitContentBundle)
+                    
+                    // Force all materials in glove models to be opaque
+                    makeMaterialsOpaque(in: leftGlove)
+                    makeMaterialsOpaque(in: rightGlove)
+                    
+                    if let leftAnchor = leftHandAnchor {
+                        leftAnchor.addChild(leftGlove)
+                        if var comp = leftAnchor.components[HandOverlayComponent.self] {
+                            comp.gloveWrapper = leftGlove
+                            comp.gloveModel = nil
+                            leftAnchor.components.set(comp)
+                        }
+                    }
+                    
+                    if let rightAnchor = rightHandAnchor {
+                        rightAnchor.addChild(rightGlove)
+                        if var comp = rightAnchor.components[HandOverlayComponent.self] {
+                            comp.gloveWrapper = rightGlove
+                            comp.gloveModel = nil
+                            rightAnchor.components.set(comp)
+                        }
+                    }
+                    print("[ImmersiveView] Glove entities loaded directly from RealityKitContent bundle!")
+                } catch {
+                    print("[ImmersiveView] Failed to load glove entities: \(error)")
+                }
+                
                 do {
                     let loveShot = try await Entity(named: "Love Shot", in: realityKitContentBundle)
                     loveShot.name = "LoveBeam"
                     loveShot.components.set(LoveBeamComponent())
                     
                     if let emitter = loveShot.findEntity(named: "ParticleEmitter") {
-                           if var vfx = emitter.components[ParticleEmitterComponent.self] {
-                               vfx.isEmitting = false // Gunakan isEmitting
-                               emitter.components.set(vfx)
-                           }
-                       }
+                        if var vfx = emitter.components[ParticleEmitterComponent.self] {
+                            vfx.isEmitting = false
+                            emitter.components.set(vfx)
+                        }
+                    }
                     
                     sceneRoot.addChild(loveShot)
                     print("[ImmersiveView] Love Shot particle system loaded!")
@@ -149,11 +190,11 @@ struct ImmersiveView: View {
             }
 
             
-            // UI
+            // HUD placement relative to user head
             let headAnchor = AnchorEntity(.head)
             headAnchor.components.set(HeadAnchorComponent())
             if let hudEntity = attachments.entity(for: "HUDOverlay") {
-                hudEntity.position = SIMD3<Float>(0.10, -0.15, -0.7)
+                hudEntity.position = SIMD3<Float>(0.0, -0.05, -0.85)
                 headAnchor.addChild(hudEntity)
             }
             content.add(headAnchor)
@@ -162,26 +203,21 @@ struct ImmersiveView: View {
             appModel.viewModel.setContent(content)
         } attachments: {
             Attachment(id: "HUDOverlay") {
-                HUDOverlayView(
-                    instruction: appModel.viewModel.currentInstruction,
-                    score: appModel.viewModel.score,
-                    timeLeft: appModel.viewModel.instructionTimer,
-                    connectionMessage: appModel.viewModel.lastConnectionMessage
-                )
+                HUDOverlayView(viewModel: appModel.viewModel)
             }
         }
-        .gesture(
-            SpatialTapGesture()
-                .targetedToAnyEntity()
-                .onEnded { value in
-                    let entity = value.entity
-                    let stateComp = entity.components[EntityStateComponent.self]
-                    
-                    if stateComp?.state == .idle || stateComp?.state == .walking {
-                        appModel.viewModel.handleShoot(entity: entity)
-                    }
-                }
-        )
+//        .gesture(
+//            SpatialTapGesture()
+//                .targetedToAnyEntity()
+//                .onEnded { value in
+//                    let entity = value.entity
+//                    let stateComp = entity.components[EntityStateComponent.self]
+//                    
+//                    if stateComp?.state == .idle || stateComp?.state == .walking {
+//                        appModel.viewModel.handleShoot(entity: entity)
+//                    }
+//                }
+//        )
         .onReceive(NotificationCenter.default.publisher(for: .spawnEntityRequested)) { _ in
             appModel.viewModel.spawnEntity()
         }
@@ -199,10 +235,7 @@ struct ImmersiveView: View {
         .task {
             let arSession = ARKitSession()
             _ = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
-
-            // Start head tracker for querying head pose/anchor
             await HeadTracker.shared.start()
-
             try? await HandTrackingService.shared.start()
         }
         
@@ -283,6 +316,26 @@ struct ImmersiveView: View {
         desc.primitives = .triangles(indices)
         
         return try MeshResource.generate(from: [desc])
+    }
+
+    @MainActor
+    private func makeMaterialsOpaque(in entity: Entity) {
+        if var modelComp = entity.components[ModelComponent.self] {
+            modelComp.materials = modelComp.materials.map { material in
+                if var pbr = material as? PhysicallyBasedMaterial {
+                    pbr.blending = .opaque
+                    return pbr
+                } else if var unlit = material as? UnlitMaterial {
+                    unlit.blending = .opaque
+                    return unlit
+                }
+                return material
+            }
+            entity.components.set(modelComp)
+        }
+        for child in entity.children {
+            makeMaterialsOpaque(in: child)
+        }
     }
 }
 

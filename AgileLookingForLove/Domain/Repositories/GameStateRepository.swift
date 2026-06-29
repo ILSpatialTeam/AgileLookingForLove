@@ -10,4 +10,5 @@ protocol GameStateRepository: AnyObject {
     var currentInstructions: GameInstruction? { get }
     func addScore(_ points: Int)
     func updateInstructions(_ instruction: GameInstruction)
+    func resetScore()
 }

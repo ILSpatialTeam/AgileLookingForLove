@@ -15,9 +15,22 @@ import RealityKitContent
 @Observable
 @MainActor
 final class GameViewModel {
+    enum GameState: Equatable {
+        case menu
+        case instructions
+        case countdown(Int)
+        case playing
+        case gameOver(victory: Bool)
+    }
+    
     private let repository: GameStateRepository
     private let generateInstruction: GenerateInstructionUseCase
     private let connectEntities: ConnectEntityUseCase
+    
+    var gameState: GameState = .menu
+    var gameTimeLeft: Double = 30.0
+    var spawnAccumulator: Double = 0.0
+    let spawnInterval: Double = 5.0
     
     var currentInstruction: GameInstruction?
     var score: Int = 0
@@ -47,6 +60,8 @@ final class GameViewModel {
             let sphereTemplate = try await Entity(named: "Animation/bundar_walk_anim", in: realityKitContentBundle)
             let cubeTemplate = try await Entity(named: "Animation/kotak_walk_anim", in: realityKitContentBundle)
             let pyramidTemplate = try await Entity(named: "Animation/segitiga_walk_anim", in: realityKitContentBundle)
+            
+             
             
             shapeTemplates[.sphere] = sphereTemplate
             shapeTemplates[.cube] = cubeTemplate
@@ -88,7 +103,6 @@ final class GameViewModel {
     }
     
     func refreshInstruction() {
-        // Collect all distinct shape kinds currently active in the room
         let kinds = activeEntities.compactMap { $0.components[ShapeComponent.self]?.kind }
         let uniqueKinds = Array(Set(kinds))
         
@@ -97,38 +111,53 @@ final class GameViewModel {
     }
     
     func tickTimer(delta: Double) {
+        guard case .playing = gameState else { return }
+        
+        // Tick instruction timer
         instructionTimer -= delta
+        if instructionTimer <= 0 {
+            refreshInstruction()
+        }
+        
+        // Spawn entities over time
+        spawnAccumulator += delta
+        if spawnAccumulator >= spawnInterval {
+            spawnAccumulator = 0.0
+            spawnEntity()
+        }
+        
+        // Tick global game timer
+        gameTimeLeft -= delta
+        if gameTimeLeft <= 0 {
+            gameTimeLeft = 0
+            gameState = .gameOver(victory: score >= 100)
+            clearPlayingEntities()
+        }
+        
         score = repository.score
-        if instructionTimer <= 0 { refreshInstruction() }
     }
-
+    
     func handleShoot(entity: Entity) {
         guard var stateComp = entity.components[EntityStateComponent.self] else { return }
         
-        // Accept idle, walking, OR already-stunned (ECS may have pre-set state; we still apply visuals)
         guard stateComp.state == .idle || stateComp.state == .walking || stateComp.state == .stunned else { return }
-
-        // Ubah state ke stunned (idempotent - safe to call even if already stunned)
+        
         stateComp.state = .stunned
         stateComp.stunTimer = 5.0
         entity.components[EntityStateComponent.self] = stateComp
-
-        // Visual feedback: entity jadi merah
-        entity.setStatusIndicator(color: .red)
         
-        // Stop animations when stunned
+        entity.setStatusIndicator(color: .red)
         entity.stopAllAnimations(recursive: true)
     }
-
     
     func handleConnect(entity: Entity) {
         guard let stateComp = entity.components[EntityStateComponent.self],
               stateComp.state == .stunned,
               let shapeComp = entity.components[ShapeComponent.self],
-        let content = self.content else { return }
+              let content = self.content else { return }
         
         if firstSelectedEntity == nil {
-            firstSelectedEntity = entity   // pilih entity pertama
+            firstSelectedEntity = entity
             highlightEntity(entity)
         } else {
             guard let first = firstSelectedEntity,
@@ -152,7 +181,6 @@ final class GameViewModel {
     
     private func highlightEntity(_ entity: Entity) {
         if var model = entity.components[ModelComponent.self] {
-            
             model.materials = [SimpleMaterial(color: .yellow, isMetallic: true)]
             entity.components[ModelComponent.self] = model
         }
@@ -165,7 +193,6 @@ final class GameViewModel {
     }
     
     func spawnEntity(in content: RealityViewContent) {
-        // Enforce the max entity count limit
         guard activeEntities.count < maxEntitiesCount else {
             print("[Spawning] Maximum character limit reached (\(maxEntitiesCount)). Skipping spawn.")
             return
@@ -195,7 +222,6 @@ final class GameViewModel {
         
         entity.components.set(InputTargetComponent())
         
-        // Random posisi di sekitar player
         let x = Float.random(in: -1.2...1.2)
         let y = Float.random(in: 0.4...0.8)
         let z = Float.random(in: -1.8 ... -1.0)
@@ -215,22 +241,20 @@ final class GameViewModel {
         entity.components[ShapeComponent.self] = ShapeComponent(kind: kind)
         entity.components[EntityStateComponent.self] = EntityStateComponent()
         
-        // Track the entity locally and add it to the scene
         activeEntities.append(entity)
         content.add(entity)
     }
-
-
+    
     func spawnEntity() {
         guard let content = self.content else { return }
         spawnEntity(in: content)
     }
-        
+    
     private func colorFor(_ kind: ShapeKind) -> UIColor {
         switch kind {
-        case .sphere:  return .systemBlue
-        case .cube:    return .systemGreen
-        case .pyramid: return .systemOrange
+        case .sphere:  return .systemRed
+        case .cube:    return .systemBlue
+        case .pyramid: return .systemGreen
         }
     }
     
@@ -245,7 +269,6 @@ final class GameViewModel {
     private func createThreadBetween(_ entityA: Entity, _ entityB: Entity, in content: RealityViewContent) {
         let posA = entityA.position(relativeTo: nil)
         let posB = entityB.position(relativeTo: nil)
-        // Buat titik-titik benang dengan sedikit sag agar terlihat alami
         let points = makeThreadPoints(from: posA, to: posB, segments: 12, sag: 0.06)
         let descriptor = TubeMeshBuilder.generateMeshDescriptor(from: points, radius: 0.004)
         do {
@@ -254,7 +277,7 @@ final class GameViewModel {
             material.color = .init(tint: UIColor(red: 0.9, green: 0.1, blue: 0.1, alpha: 1.0))
             let threadEntity = ModelEntity(mesh: mesh, materials: [material])
             threadEntity.name = "RedThread_\(entityA.id)_\(entityB.id)"
-            // Tambah ke canvas jika ada, atau langsung ke content
+            
             if let canvas = canvasEntity {
                 canvas.addChild(threadEntity)
             } else {
@@ -270,7 +293,7 @@ final class GameViewModel {
         for i in 0...segments {
             let t = Float(i) / Float(segments)
             var p = start + (end - start) * t
-            p.y -= sag * sin(t * .pi)   // catenary effect
+            p.y -= sag * sin(t * .pi)
             points.append(p)
         }
         return points
@@ -279,74 +302,76 @@ final class GameViewModel {
     func handleThreadStroke(entityA: Entity, entityB: Entity, strokeEntity: Entity?) {
         guard let shapeA = entityA.components[ShapeComponent.self],
               let shapeB = entityB.components[ShapeComponent.self] else {
-            print("[Connection] Entity tidak punya ShapeComponent")
+            print("[Connection] Entity does not have ShapeComponent")
             strokeEntity?.removeFromParent()
             return
         }
-
+        
         let isValid = connectEntities.execute(
             fromShape: shapeA.kind,
             toShape: shapeB.kind
         )
-
+        
         if isValid {
-            // VALID
             connectionResult = .valid(fromShape: shapeA.kind, toShape: shapeB.kind)
-            lastConnectionMessage = "BENAR! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) +100"
+            lastConnectionMessage = "CORRECT! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) +100"
             score = repository.score
-
+            
             markConnected(entityA)
             markConnected(entityB)
             
-            activeEntities.removeAll(where: {$0 == entityA || $0 == entityB})
-
+            activeEntities.removeAll(where: { $0 == entityA || $0 == entityB })
+            
             setColor(.systemGreen, on: entityA)
             setColor(.systemGreen, on: entityB)
-
+            
             if let strokeEntity {
                 strokeEntity.name = "RedThread_\(entityA.id)_\(entityB.id)"
             }
-
-            // Clear entities and the thread after 3 seconds
-            Task {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                strokeEntity?.removeFromParent()
-                
-                if strokeEntity == nil {
-                    let threadName = "RedThread_\(entityA.id)_\(entityB.id)"
-                    if let parent = entityA.parent,
-                       let thread = parent.children.first(where: { $0.name == threadName }) {
-                        thread.removeFromParent()
-                    }
+            
+            // Immediately remove thread on valid merge
+            strokeEntity?.removeFromParent()
+            if strokeEntity == nil {
+                let threadName = "RedThread_\(entityA.id)_\(entityB.id)"
+                if let parent = entityA.parent,
+                   let thread = parent.children.first(where: { $0.name == threadName }) {
+                    thread.removeFromParent()
                 }
-                
-                entityA.removeFromParent()
-                entityB.removeFromParent()
             }
-
+            
+            // Calculate midpoint for the merge
+            let posA = entityA.position(relativeTo: nil)
+            let posB = entityB.position(relativeTo: nil)
+            let midpoint = (posA + posB) / 2.0
+            
+            // Add Merge animation, remove physics & old animations
+            entityA.components.remove(PhysicsBodyComponent.self)
+            entityB.components.remove(PhysicsBodyComponent.self)
+            entityA.stopAllAnimations(recursive: true)
+            entityB.stopAllAnimations(recursive: true)
+            
+            entityA.components.set(MergeAnimationComponent(midpoint: midpoint, startPosition: posA))
+            entityB.components.set(MergeAnimationComponent(midpoint: midpoint, startPosition: posB))
+            
             print("[Connection] VALID: \(shapeA.kind) → \(shapeB.kind) | Score: \(score)")
-
-            // Auto clear result message setelah 2 detik
+            
             Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 connectionResult = .none
                 lastConnectionMessage = ""
             }
-
         } else {
-            // INVALID
             let instruction = currentInstruction?.description ?? "?"
             connectionResult = .invalid(fromShape: shapeA.kind, toShape: shapeB.kind)
-            lastConnectionMessage = "SALAH! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) | Instruksi: \(instruction)"
-
-            print("[Connection] INVALID: \(shapeA.kind) → \(shapeB.kind) | Instruksi: \(instruction)")
-
-            // Remove the invalid connection line immediately
+            lastConnectionMessage = "WRONG! \(shapeA.kind.displaySymbol) → \(shapeB.kind.displaySymbol) | Instruction: \(instruction)"
+            
+            print("[Connection] INVALID: \(shapeA.kind) → \(shapeB.kind) | Instruction: \(instruction)")
+            
             strokeEntity?.removeFromParent()
-
+            
             setColor(.red, on: entityA)
             setColor(.red, on: entityB)
-
+            
             Task {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 connectionResult = .none
@@ -357,5 +382,85 @@ final class GameViewModel {
     
     private func setColor(_ color: UIColor, on entity: Entity) {
         entity.setStatusIndicator(color: color)
+    }
+    
+    func startCountdown() {
+        gameState = .countdown(3)
+        
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(3) = gameState {
+                gameState = .countdown(2)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(2) = gameState {
+                gameState = .countdown(1)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(1) = gameState {
+                startGamePlay()
+            }
+        }
+    }
+    
+    private func startGamePlay() {
+        clearPlayingEntities()
+        gameState = .playing
+        gameTimeLeft = 30.0
+        spawnAccumulator = 0.0
+        repository.resetScore()
+        score = 0
+        
+        // Spawn initial 4 entities
+        for _ in 0..<4 {
+            spawnEntity()
+        }
+        
+        refreshInstruction()
+    }
+    
+    func clearPlayingEntities() {
+        for entity in activeEntities {
+            entity.removeFromParent()
+        }
+        activeEntities.removeAll()
+        
+        if let content = self.content {
+            if let drawController = content.entities.first(where: { $0.name == "DrawController" }) {
+                if var dc = drawController.components[DrawingComponent.self] {
+                    dc.activeStrokeEntity = nil
+                    dc.currentStrokeID = nil
+                    dc.activeStrokePoints.removeAll()
+                    dc.lastPlacedPosition = nil
+                    dc.isGeneratingMesh = false
+                    drawController.components.set(dc)
+                }
+                if var isDrawing = drawController.components[IsDrawingComponent.self] {
+                    isDrawing.isActive = false
+                    isDrawing.frameCount = 0
+                    drawController.components.set(isDrawing)
+                }
+            }
+            
+            if let canvas = content.entities.first(where: { $0.name == "RedThreadCanvas" }) {
+                canvas.children.removeAll()
+            }
+            
+            let extraEntities = content.entities.filter { 
+                ($0.name.hasPrefix("RedThread") && $0.name != "RedThreadCanvas") || 
+                $0.name == "LoveProjectile" 
+            }
+            for entity in extraEntities {
+                entity.removeFromParent()
+            }
+        }
+        firstSelectedEntity = nil
+    }
+    
+    func exitToMenu() {
+        clearPlayingEntities()
+        gameState = .menu
     }
 }
