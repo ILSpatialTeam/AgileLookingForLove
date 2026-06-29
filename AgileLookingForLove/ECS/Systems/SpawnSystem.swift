@@ -13,7 +13,7 @@ final class SpawnSystem: System {
     
     private var spawnTimer: Double = 0.0
     private let spawnInterval: Double = 5.0
-    private let maxEnties = 6
+    private let maxEnties = 12
     
     required init(scene: Scene) {}
     

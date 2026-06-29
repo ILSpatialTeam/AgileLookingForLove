@@ -19,4 +19,7 @@ final class InMemoryGameStateRepository: GameStateRepository {
     func updateInstructions(_ instruction: GameInstruction) {
         currentInstructions = instruction
     }
+    func resetScore() {
+        score = 0
+    }
 }

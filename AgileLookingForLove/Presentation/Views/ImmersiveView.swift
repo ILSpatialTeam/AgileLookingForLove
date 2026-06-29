@@ -27,33 +27,33 @@ struct ImmersiveView: View {
             EntityStateComponent.registerComponent()
             ThreadAnchorComponent.registerComponent()
             RedThreadValidationSystem.registerSystem()
+            MergeAnimationComponent.registerComponent()
+            MergeAnimationSystem.registerSystem()
             LoveBeamComponent.registerComponent()
             HeadAnchorComponent.registerComponent()
             LoveProjectileComponent.registerComponent()
             EnvironmentComponent.registerComponent()
             
-            //ILDraw Package
+            // Register draw package systems
             ILFeatureHandTrackingSetup.registerSystems()
-                        
-                        IsDrawingComponent.registerComponent()
-                        DrawingComponent.registerComponent()
-                        CanvasComponent.registerComponent()
-                        SharePlayReceiverComponent.registerComponent()
-                        
-                        CustomPinchGestureSystem.registerSystem()
-                        DrawingSystem.registerSystem()
+            IsDrawingComponent.registerComponent()
+            DrawingComponent.registerComponent()
+            CanvasComponent.registerComponent()
+            SharePlayReceiverComponent.registerComponent()
             
-            //Canvas Entity
+            CustomPinchGestureSystem.registerSystem()
+            CustomDrawingSystem.registerSystem()
+            
+            // Canvas setup
             let canvas = Entity()
             canvas.name = "RedThreadCanvas"
             canvas.components.set(CanvasComponent())
             content.add(canvas)
             
-            //DrawController
+            // Draw controller setup
             let drawController = Entity()
             drawController.name = "DrawController"
             
-            //Red Strting
             var drawComp = DrawingComponent()
             drawComp.currentColor = SIMD4<Float>(0.9, 0.1, 0.1, 1.0)
             drawComp.sphereRadius = 0.004
@@ -64,15 +64,26 @@ struct ImmersiveView: View {
             content.add(drawController)
             
             let hands = HandEntitySpawner.spawnHands()
-            for hand in hands {content.add(hand)}
+            var leftHandAnchor: Entity? = nil
+            var rightHandAnchor: Entity? = nil
+            for hand in hands {
+                if hand.name == "LeftHandAnchor" {
+                    hand.components.set(HandOverlayComponent(chirality: .left))
+                    leftHandAnchor = hand
+                } else if hand.name == "RightHandAnchor" {
+                    hand.components.set(HandOverlayComponent(chirality: .right))
+                    rightHandAnchor = hand
+                }
+                content.add(hand)
+            }
             
-            // Add a fallback static floor collider so entities don't fall into the abyss before spatial tracking loads
+            // Fallback floor collider
             let fallbackFloor = Entity()
             fallbackFloor.name = "FallbackFloor"
             let floorShape = ShapeResource.generateBox(width: 50, height: 0.1, depth: 50)
             fallbackFloor.components.set(CollisionComponent(shapes: [floorShape], isStatic: true))
             fallbackFloor.components.set(PhysicsBodyComponent(mode: .static))
-            fallbackFloor.position = SIMD3<Float>(0, -0.05, 0) // top surface is at y = 0
+            fallbackFloor.position = SIMD3<Float>(0, -0.05, 0)
             content.add(fallbackFloor)
             
             // Persistent root entity for all async entity additions.
@@ -95,11 +106,11 @@ struct ImmersiveView: View {
                     loveShot.components.set(LoveBeamComponent())
                     
                     if let emitter = loveShot.findEntity(named: "ParticleEmitter") {
-                           if var vfx = emitter.components[ParticleEmitterComponent.self] {
-                               vfx.isEmitting = false // Gunakan isEmitting
-                               emitter.components.set(vfx)
-                           }
-                       }
+                        if var vfx = emitter.components[ParticleEmitterComponent.self] {
+                            vfx.isEmitting = false
+                            emitter.components.set(vfx)
+                        }
+                    }
                     
                     sceneRoot.addChild(loveShot)
                     print("[ImmersiveView] Love Shot particle system loaded!")
@@ -108,21 +119,21 @@ struct ImmersiveView: View {
                 }
             }
             
-            // Start plane detection to find and spawn floor
+            // Start room tracking session
             Task {
                 let configuration = SpatialTrackingSession.Configuration(
                     tracking: [],
                     sceneUnderstanding: [.collision, .physics]
                 )
-                let _ = await trackingSession.run(configuration)
-                print("Spatial Tracking Session (Room Mesh) berjalan sukses!")
+                _ = await trackingSession.run(configuration)
+                print("Spatial Tracking Session running successfully!")
             }
             
-            // UI
+            // HUD placement relative to user head
             let headAnchor = AnchorEntity(.head)
             headAnchor.components.set(HeadAnchorComponent())
             if let hudEntity = attachments.entity(for: "HUDOverlay") {
-                hudEntity.position = SIMD3<Float>(0.10, -0.15, -0.7)
+                hudEntity.position = SIMD3<Float>(0.0, -0.05, -0.85)
                 headAnchor.addChild(hudEntity)
             }
             content.add(headAnchor)
@@ -134,12 +145,7 @@ struct ImmersiveView: View {
             }
         } attachments: {
             Attachment(id: "HUDOverlay") {
-                HUDOverlayView(
-                    instruction: appModel.viewModel.currentInstruction,
-                    score: appModel.viewModel.score,
-                    timeLeft: appModel.viewModel.instructionTimer,
-                    connectionMessage: appModel.viewModel.lastConnectionMessage
-                )
+                HUDOverlayView(viewModel: appModel.viewModel)
             }
         }
         .gesture(
@@ -182,11 +188,28 @@ struct ImmersiveView: View {
         .task {
             let arSession = ARKitSession()
             _ = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
-
-            // Start head tracker for querying head pose/anchor
             await HeadTracker.shared.start()
-
             try? await HandTrackingService.shared.start()
+        }
+    }
+
+    @MainActor
+    private func makeMaterialsOpaque(in entity: Entity) {
+        if var modelComp = entity.components[ModelComponent.self] {
+            modelComp.materials = modelComp.materials.map { material in
+                if var pbr = material as? PhysicallyBasedMaterial {
+                    pbr.blending = .opaque
+                    return pbr
+                } else if var unlit = material as? UnlitMaterial {
+                    unlit.blending = .opaque
+                    return unlit
+                }
+                return material
+            }
+            entity.components.set(modelComp)
+        }
+        for child in entity.children {
+            makeMaterialsOpaque(in: child)
         }
     }
 }
