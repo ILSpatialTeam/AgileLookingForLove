@@ -37,7 +37,7 @@ public struct CustomPinchGestureSystem: System {
         let loveBeamQuery = EntityQuery(where: .has(LoveBeamComponent.self))
         let loveBeams = context.entities(matching: loveBeamQuery, updatingSystemWhen: .rendering)
         var loveBeamIterator = loveBeams.makeIterator()
-        guard let loveBeam = loveBeamIterator.next() else { return }
+        let loveBeam = loveBeamIterator.next()
         
         let entities = context.entities(matching: Self.query, updatingSystemWhen: .rendering)
         
@@ -100,7 +100,11 @@ public struct CustomPinchGestureSystem: System {
                 let thumbTip = ILHandPoseUtilities.worldPosition(of: .thumbTip, handAnchor: rightHand, skeleton: rightSkeleton)
                 
                 let pinchDist = simd_distance(middleTip, thumbTip)
-                let pinchActive = pinchDist < 0.02
+                let pinchActive = pinchDist < 0.035
+                
+                if Int.random(in: 1...30) == 1 {
+                    print("[CustomPinchGestureSystem] Right hand tracked. Middle-thumb dist: \(pinchDist) meters. active: \(pinchActive), frameCount: \(isDrawingComp.frameCount)")
+                }
                 
                 if pinchActive {
                     isDrawingComp.frameCount = min(isDrawingComp.frameCount + 1, 10)
@@ -113,6 +117,9 @@ public struct CustomPinchGestureSystem: System {
                     isDrawingComp.tipPosition = middleTip
                 }
             } else {
+                if Int.random(in: 1...60) == 1 {
+                    print("[CustomPinchGestureSystem] Right hand NOT tracked or missing skeleton")
+                }
                 isDrawingComp.frameCount = 0
                 isDrawingComp.isActive = false
             }
@@ -120,58 +127,60 @@ public struct CustomPinchGestureSystem: System {
             entity.components.set(isDrawingComp)
         }
         
-        // Update particle beam and projectiles
-        if isHeartGestureActive {
-            loveBeam.position = heartCenter
-            
-            if let emitterEntity = loveBeam.findEntity(named: "ParticleEmitter") {
-                if var vfx = emitterEntity.components[ParticleEmitterComponent.self] {
-                    vfx.speed = 3.0
-                    vfx.speedVariation = 0.5
-                    vfx.mainEmitter.size = 0.05
-                    vfx.mainEmitter.sizeMultiplierAtEndOfLifespan = 4.0
-                    vfx.mainEmitter.sizeMultiplierAtEndOfLifespanPower = 1.0
-                    vfx.mainEmitter.lifeSpan = 1.5
-                    vfx.mainEmitter.birthRate = 25.0
-                    vfx.mainEmitter.stretchFactor = 0.0
-                    vfx.mainEmitter.acceleration = SIMD3<Float>(0, 1.5, 0)
-                    vfx.mainEmitter.angleVariation = 0.15
-                    
-                    let from = SIMD3<Float>(0, 1, 0)
-                    let to = beamDirection
-                    emitterEntity.orientation = quaternionFromTo(from: from, to: to)
-                    
-                    if !vfx.isEmitting {
-                        vfx.isEmitting = true
-                    }
-                    
-                    let now = Date()
-                    if now.timeIntervalSince(Self.lastShootTime) >= 0.5 {
-                        Self.lastShootTime = now
+        // Update particle beam and projectiles if loveBeam is present
+        if let loveBeam = loveBeam {
+            if isHeartGestureActive {
+                loveBeam.position = heartCenter
+                
+                if let emitterEntity = loveBeam.findEntity(named: "ParticleEmitter") {
+                    if var vfx = emitterEntity.components[ParticleEmitterComponent.self] {
+                        vfx.speed = 3.0
+                        vfx.speedVariation = 0.5
+                        vfx.mainEmitter.size = 0.05
+                        vfx.mainEmitter.sizeMultiplierAtEndOfLifespan = 4.0
+                        vfx.mainEmitter.sizeMultiplierAtEndOfLifespanPower = 1.0
+                        vfx.mainEmitter.lifeSpan = 1.5
+                        vfx.mainEmitter.birthRate = 25.0
+                        vfx.mainEmitter.stretchFactor = 0.0
+                        vfx.mainEmitter.acceleration = SIMD3<Float>(0, 1.5, 0)
+                        vfx.mainEmitter.angleVariation = 0.15
                         
-                        let projectile = Entity()
-                        projectile.name = "LoveProjectile"
-                        projectile.position = heartCenter
-                        projectile.components.set(LoveProjectileComponent(direction: beamDirection))
+                        let from = SIMD3<Float>(0, 1, 0)
+                        let to = beamDirection
+                        emitterEntity.orientation = quaternionFromTo(from: from, to: to)
                         
-                        if let parent = loveBeam.parent {
-                            parent.addChild(projectile)
-                        } else if let sceneRoot = context.scene.findEntity(named: "SceneRoot") {
-                            sceneRoot.addChild(projectile)
-                        } else {
-                            loveBeam.addChild(projectile)
+                        if !vfx.isEmitting {
+                            vfx.isEmitting = true
                         }
-                    }
-                    
-                    emitterEntity.components.set(vfx)
-                }
-            }
-        } else {
-            if let emitterEntity = loveBeam.findEntity(named: "ParticleEmitter") {
-                if var vfx = emitterEntity.components[ParticleEmitterComponent.self] {
-                    if vfx.isEmitting {
-                        vfx.isEmitting = false
+                        
+                        let now = Date()
+                        if now.timeIntervalSince(Self.lastShootTime) >= 0.5 {
+                            Self.lastShootTime = now
+                            
+                            let projectile = Entity()
+                            projectile.name = "LoveProjectile"
+                            projectile.position = heartCenter
+                            projectile.components.set(LoveProjectileComponent(direction: beamDirection))
+                            
+                            if let parent = loveBeam.parent {
+                                parent.addChild(projectile)
+                            } else if let sceneRoot = context.scene.findEntity(named: "SceneRoot") {
+                                sceneRoot.addChild(projectile)
+                            } else {
+                                loveBeam.addChild(projectile)
+                            }
+                        }
+                        
                         emitterEntity.components.set(vfx)
+                    }
+                }
+            } else {
+                if let emitterEntity = loveBeam.findEntity(named: "ParticleEmitter") {
+                    if var vfx = emitterEntity.components[ParticleEmitterComponent.self] {
+                        if vfx.isEmitting {
+                            vfx.isEmitting = false
+                            emitterEntity.components.set(vfx)
+                        }
                     }
                 }
             }

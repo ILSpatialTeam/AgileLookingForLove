@@ -19,7 +19,6 @@ struct ImmersiveView: View {
 
     var body: some View {
         RealityView { (content: inout RealityViewContent, attachments: RealityViewAttachments) in
-            SpawnSystem.registerSystem()
             InstructionSystem.registerSystem()
             ThreadSystem.registerSystem()
             MovementSystem.registerSystem()
@@ -44,7 +43,7 @@ struct ImmersiveView: View {
             SharePlayReceiverComponent.registerComponent()
             
             CustomPinchGestureSystem.registerSystem()
-            DrawingSystem.registerSystem()
+            CustomDrawingSystem.registerSystem()
             
             // Canvas setup
             let canvas = Entity()
@@ -107,6 +106,10 @@ struct ImmersiveView: View {
                         let leftGlove = try await ModelEntity(contentsOf: leftURL)
                         let rightGlove = try await ModelEntity(contentsOf: rightURL)
                         
+                        // Force all materials in glove models to be opaque
+                        makeMaterialsOpaque(in: leftGlove)
+                        makeMaterialsOpaque(in: rightGlove)
+                        
                         if let leftAnchor = leftHandAnchor {
                             leftAnchor.addChild(leftGlove)
                             if var comp = leftAnchor.components[HandOverlayComponent.self] {
@@ -149,11 +152,6 @@ struct ImmersiveView: View {
                 } catch {
                     print("[ImmersiveView] Failed to load Love Shot: \(error)")
                 }
-                
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                for _ in 0..<4 {
-                    appModel.viewModel.spawnEntity()
-                }
             }
             
             // Start room tracking session
@@ -170,7 +168,7 @@ struct ImmersiveView: View {
             let headAnchor = AnchorEntity(.head)
             headAnchor.components.set(HeadAnchorComponent())
             if let hudEntity = attachments.entity(for: "HUDOverlay") {
-                hudEntity.position = SIMD3<Float>(0.10, -0.15, -0.7)
+                hudEntity.position = SIMD3<Float>(0.0, -0.05, -0.85)
                 headAnchor.addChild(hudEntity)
             }
             content.add(headAnchor)
@@ -179,12 +177,7 @@ struct ImmersiveView: View {
             appModel.viewModel.setContent(content)
         } attachments: {
             Attachment(id: "HUDOverlay") {
-                HUDOverlayView(
-                    instruction: appModel.viewModel.currentInstruction,
-                    score: appModel.viewModel.score,
-                    timeLeft: appModel.viewModel.instructionTimer,
-                    connectionMessage: appModel.viewModel.lastConnectionMessage
-                )
+                HUDOverlayView(viewModel: appModel.viewModel)
             }
         }
         .gesture(
@@ -218,6 +211,26 @@ struct ImmersiveView: View {
             _ = await arSession.requestAuthorization(for: [.handTracking, .worldSensing])
             await HeadTracker.shared.start()
             try? await HandTrackingService.shared.start()
+        }
+    }
+
+    @MainActor
+    private func makeMaterialsOpaque(in entity: Entity) {
+        if var modelComp = entity.components[ModelComponent.self] {
+            modelComp.materials = modelComp.materials.map { material in
+                if var pbr = material as? PhysicallyBasedMaterial {
+                    pbr.blending = .opaque
+                    return pbr
+                } else if var unlit = material as? UnlitMaterial {
+                    unlit.blending = .opaque
+                    return unlit
+                }
+                return material
+            }
+            entity.components.set(modelComp)
+        }
+        for child in entity.children {
+            makeMaterialsOpaque(in: child)
         }
     }
 }

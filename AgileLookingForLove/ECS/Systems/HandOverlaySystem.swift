@@ -20,7 +20,7 @@ public class HandOverlaySystem: System {
         for entity in context.entities(matching: Self.query, updatingSystemWhen: .rendering) {
             guard var overlay = entity.components[HandOverlayComponent.self] else { continue }
             
-            // Wait until the glove model has been loaded and set
+            // glove model load
             guard let gloveWrapper = overlay.gloveWrapper else { continue }
 
             // Locate the ModelEntity from the loaded wrapper if we haven't yet

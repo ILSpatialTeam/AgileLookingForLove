@@ -9,7 +9,6 @@ import RealityKit
 import simd
 import Foundation
 
-
 class MergeAnimationSystem: System {
 
     static let query = EntityQuery(where: .has(MergeAnimationComponent.self))
@@ -83,7 +82,7 @@ class MergeAnimationSystem: System {
         }
     }
 
-    // MARK: Helpers
+    //Helpers
     private func smoothstep(_ t: Float) -> Float {
         let c = max(0, min(t, 1))
         return c * c * (3 - 2 * c)

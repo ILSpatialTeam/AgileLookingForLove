@@ -15,9 +15,22 @@ import RealityKitContent
 @Observable
 @MainActor
 final class GameViewModel {
+    enum GameState: Equatable {
+        case menu
+        case instructions
+        case countdown(Int)
+        case playing
+        case gameOver(victory: Bool)
+    }
+    
     private let repository: GameStateRepository
     private let generateInstruction: GenerateInstructionUseCase
     private let connectEntities: ConnectEntityUseCase
+    
+    var gameState: GameState = .menu
+    var gameTimeLeft: Double = 30.0
+    var spawnAccumulator: Double = 0.0
+    let spawnInterval: Double = 5.0
     
     var currentInstruction: GameInstruction?
     var score: Int = 0
@@ -98,9 +111,30 @@ final class GameViewModel {
     }
     
     func tickTimer(delta: Double) {
+        guard case .playing = gameState else { return }
+        
+        // Tick instruction timer
         instructionTimer -= delta
+        if instructionTimer <= 0 {
+            refreshInstruction()
+        }
+        
+        // Spawn entities over time
+        spawnAccumulator += delta
+        if spawnAccumulator >= spawnInterval {
+            spawnAccumulator = 0.0
+            spawnEntity()
+        }
+        
+        // Tick global game timer
+        gameTimeLeft -= delta
+        if gameTimeLeft <= 0 {
+            gameTimeLeft = 0
+            gameState = .gameOver(victory: score >= 100)
+            clearPlayingEntities()
+        }
+        
         score = repository.score
-        if instructionTimer <= 0 { refreshInstruction() }
     }
     
     func handleShoot(entity: Entity) {
@@ -218,9 +252,9 @@ final class GameViewModel {
     
     private func colorFor(_ kind: ShapeKind) -> UIColor {
         switch kind {
-        case .sphere:  return .systemBlue
-        case .cube:    return .systemGreen
-        case .pyramid: return .systemOrange
+        case .sphere:  return .systemRed
+        case .cube:    return .systemBlue
+        case .pyramid: return .systemGreen
         }
     }
     
@@ -348,5 +382,85 @@ final class GameViewModel {
     
     private func setColor(_ color: UIColor, on entity: Entity) {
         entity.setStatusIndicator(color: color)
+    }
+    
+    func startCountdown() {
+        gameState = .countdown(3)
+        
+        Task {
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(3) = gameState {
+                gameState = .countdown(2)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(2) = gameState {
+                gameState = .countdown(1)
+            } else { return }
+            
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if case .countdown(1) = gameState {
+                startGamePlay()
+            }
+        }
+    }
+    
+    private func startGamePlay() {
+        clearPlayingEntities()
+        gameState = .playing
+        gameTimeLeft = 30.0
+        spawnAccumulator = 0.0
+        repository.resetScore()
+        score = 0
+        
+        // Spawn initial 4 entities
+        for _ in 0..<4 {
+            spawnEntity()
+        }
+        
+        refreshInstruction()
+    }
+    
+    func clearPlayingEntities() {
+        for entity in activeEntities {
+            entity.removeFromParent()
+        }
+        activeEntities.removeAll()
+        
+        if let content = self.content {
+            if let drawController = content.entities.first(where: { $0.name == "DrawController" }) {
+                if var dc = drawController.components[DrawingComponent.self] {
+                    dc.activeStrokeEntity = nil
+                    dc.currentStrokeID = nil
+                    dc.activeStrokePoints.removeAll()
+                    dc.lastPlacedPosition = nil
+                    dc.isGeneratingMesh = false
+                    drawController.components.set(dc)
+                }
+                if var isDrawing = drawController.components[IsDrawingComponent.self] {
+                    isDrawing.isActive = false
+                    isDrawing.frameCount = 0
+                    drawController.components.set(isDrawing)
+                }
+            }
+            
+            if let canvas = content.entities.first(where: { $0.name == "RedThreadCanvas" }) {
+                canvas.children.removeAll()
+            }
+            
+            let extraEntities = content.entities.filter { 
+                ($0.name.hasPrefix("RedThread") && $0.name != "RedThreadCanvas") || 
+                $0.name == "LoveProjectile" 
+            }
+            for entity in extraEntities {
+                entity.removeFromParent()
+            }
+        }
+        firstSelectedEntity = nil
+    }
+    
+    func exitToMenu() {
+        clearPlayingEntities()
+        gameState = .menu
     }
 }

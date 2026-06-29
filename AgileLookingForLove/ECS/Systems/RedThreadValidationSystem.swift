@@ -79,8 +79,8 @@ final class RedThreadValidationSystem: System {
                 
                 guard stateComp.state == .stunned else { continue }
                 
-                // Use the visual center of the shape (visual bounds center in world space)
-                let visualCenter = shape.visualBounds(relativeTo: nil).center
+                // Use the actual position of the shape in world space
+                let visualCenter = shape.position(relativeTo: nil)
                 let dStart = simd_distance(visualCenter, startPoint)
                 let dEnd   = simd_distance(visualCenter, endPoint)
                 

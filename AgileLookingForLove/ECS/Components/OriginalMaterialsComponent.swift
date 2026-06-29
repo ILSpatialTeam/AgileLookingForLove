@@ -2,6 +2,8 @@
 //  OriginalMaterialsComponent.swift
 //  AgileLookingForLove
 //
+//  Created by Muhammad Benny Fathurrahman on 22/06/26.
+//
 
 import RealityKit
 import UIKit
