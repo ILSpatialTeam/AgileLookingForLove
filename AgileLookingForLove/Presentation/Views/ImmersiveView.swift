@@ -98,41 +98,35 @@ struct ImmersiveView: View {
             Task {
                 await appModel.viewModel.loadTemplates()
                 
-                // Load Glove Meshes from main app bundle directly
+                // Load Glove Meshes from RealityKitContent bundle
                 do {
-                    if let leftURL = Bundle.main.url(forResource: "LeftGlove", withExtension: "usdz"),
-                       let rightURL = Bundle.main.url(forResource: "RightGlove", withExtension: "usdz") {
-                        
-                        let leftGlove = try await ModelEntity(contentsOf: leftURL)
-                        let rightGlove = try await ModelEntity(contentsOf: rightURL)
-                        
-                        // Force all materials in glove models to be opaque
-                        makeMaterialsOpaque(in: leftGlove)
-                        makeMaterialsOpaque(in: rightGlove)
-                        
-                        if let leftAnchor = leftHandAnchor {
-                            leftAnchor.addChild(leftGlove)
-                            if var comp = leftAnchor.components[HandOverlayComponent.self] {
-                                comp.gloveWrapper = leftGlove
-                                comp.gloveModel = leftGlove
-                                leftAnchor.components.set(comp)
-                            }
+                    let leftGlove = try await Entity(named: "Meshes/LeftGlove", in: realityKitContentBundle)
+                    let rightGlove = try await Entity(named: "Meshes/RightGlove", in: realityKitContentBundle)
+                    
+                    // Force all materials in glove models to be opaque
+                    makeMaterialsOpaque(in: leftGlove)
+                    makeMaterialsOpaque(in: rightGlove)
+                    
+                    if let leftAnchor = leftHandAnchor {
+                        leftAnchor.addChild(leftGlove)
+                        if var comp = leftAnchor.components[HandOverlayComponent.self] {
+                            comp.gloveWrapper = leftGlove
+                            comp.gloveModel = nil
+                            leftAnchor.components.set(comp)
                         }
-                        
-                        if let rightAnchor = rightHandAnchor {
-                            rightAnchor.addChild(rightGlove)
-                            if var comp = rightAnchor.components[HandOverlayComponent.self] {
-                                comp.gloveWrapper = rightGlove
-                                comp.gloveModel = rightGlove
-                                rightAnchor.components.set(comp)
-                            }
-                        }
-                        print("[ImmersiveView] Glove ModelEntities loaded directly from main bundle resources!")
-                    } else {
-                        print("[ImmersiveView] LeftGlove or RightGlove not found in main bundle.")
                     }
+                    
+                    if let rightAnchor = rightHandAnchor {
+                        rightAnchor.addChild(rightGlove)
+                        if var comp = rightAnchor.components[HandOverlayComponent.self] {
+                            comp.gloveWrapper = rightGlove
+                            comp.gloveModel = nil
+                            rightAnchor.components.set(comp)
+                        }
+                    }
+                    print("[ImmersiveView] Glove entities loaded directly from RealityKitContent bundle!")
                 } catch {
-                    print("[ImmersiveView] Failed to load glove ModelEntities: \(error)")
+                    print("[ImmersiveView] Failed to load glove entities: \(error)")
                 }
                 
                 do {
@@ -180,18 +174,18 @@ struct ImmersiveView: View {
                 HUDOverlayView(viewModel: appModel.viewModel)
             }
         }
-        .gesture(
-            SpatialTapGesture()
-                .targetedToAnyEntity()
-                .onEnded { value in
-                    let entity = value.entity
-                    let stateComp = entity.components[EntityStateComponent.self]
-                    
-                    if stateComp?.state == .idle || stateComp?.state == .walking {
-                        appModel.viewModel.handleShoot(entity: entity)
-                    }
-                }
-        )
+//        .gesture(
+//            SpatialTapGesture()
+//                .targetedToAnyEntity()
+//                .onEnded { value in
+//                    let entity = value.entity
+//                    let stateComp = entity.components[EntityStateComponent.self]
+//                    
+//                    if stateComp?.state == .idle || stateComp?.state == .walking {
+//                        appModel.viewModel.handleShoot(entity: entity)
+//                    }
+//                }
+//        )
         .onReceive(NotificationCenter.default.publisher(for: .spawnEntityRequested)) { _ in
             appModel.viewModel.spawnEntity()
         }
