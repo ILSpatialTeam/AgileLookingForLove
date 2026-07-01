@@ -12,6 +12,8 @@ import ILSSpatialDraw
 import ILSHandTracking
 import ARKit
 
+
+//search about the view what
 struct ImmersiveView: View {
     @Environment(AppModel.self) var appModel
     @State private var floorEntity: Entity? = nil
@@ -186,9 +188,6 @@ struct ImmersiveView: View {
 //                    }
 //                }
 //        )
-        .onReceive(NotificationCenter.default.publisher(for: .spawnEntityRequested)) { _ in
-            appModel.viewModel.spawnEntity()
-        }
         .onReceive(NotificationCenter.default.publisher(for: .threadStrokeConnected)) { notif in
             guard let a = notif.userInfo?["entityA"] as? Entity,
                   let b = notif.userInfo?["entityB"] as? Entity else { return }

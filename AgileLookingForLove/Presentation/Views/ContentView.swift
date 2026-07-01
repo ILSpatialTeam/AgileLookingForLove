@@ -16,6 +16,9 @@ struct ContentView: View {
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+    
     private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -62,6 +65,16 @@ struct ContentView: View {
                 appModel.viewModel.tickTimer(delta: 0.1)
             }
         }
+        .onChange(of: appModel.viewModel.gameState) { oldState, newState in
+            switch newState {
+            case .gameOver:
+                openWindow(id: "LeaderboardWindow")
+            case .countdown, .playing:
+                dismissWindow(id: "LeaderboardWindow")
+            default:
+                break
+            }
+        }
     }
 }
 
@@ -69,6 +82,7 @@ struct ContentView: View {
 struct MainMenuView: View {
     let appModel: AppModel
     let startAction: () -> Void
+    @Environment(\.openWindow) private var openWindow
     
     var body: some View {
         VStack(spacing: 28) {
@@ -104,6 +118,18 @@ struct MainMenuView: View {
             .tint(.pink)
             .padding(.horizontal, 32)
             .padding(.bottom, 24)
+            
+            Spacer()
+            
+            Button(action: { openWindow(id: "LeaderboardWindow")
+            }) {
+                Text("Leaderboard")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+            }
+            .buttonStyle(.bordered)
         }
     }
 }
@@ -127,7 +153,7 @@ struct InstructionsView: View {
                 
                 InstructionRow(icon: "list.bullet.clipboard.fill", text: "Follow the Target Recipe shown in the Objective panel (e.g. Square + Circle).")
                 
-                InstructionRow(icon: "clock.fill", text: "Reach a score of 100 before the game timer runs out!")
+                InstructionRow(icon: "clock.fill", text: "Reach a score of 400 before the game timer runs out!")
             }
             .padding(.horizontal, 16)
             

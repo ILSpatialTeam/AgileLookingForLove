@@ -20,7 +20,6 @@ final class MovementSystem: System {
             
             var pos = entity.position(relativeTo: nil)
             
-            // Failsafe check for falling shapes
             if pos.y < -0.2 {
                 var newPos = entity.position
                 newPos.y = 0.1
@@ -46,7 +45,7 @@ final class MovementSystem: System {
                     stateComp.soundTimer = Double.random(in: 6...12)
                 }
                 
-                // max distance for the love
+                // max distance
                 let distanceXZ = sqrt(pos.x * pos.x + pos.z * pos.z)
                 if distanceXZ > 4.0 {
                     let toOrigin = normalize(SIMD3<Float>(-pos.x, 0, -pos.z))

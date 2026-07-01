@@ -8,6 +8,9 @@
 def Xform "Root"
 {
     reorder nameChildren = ["Sphere_Left", "Sphere_Right", "GridMaterial"]
+    float3 xformOp:translate = (0, 0, 0)
+    uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
     def Sphere "Sphere_Right" (
         active = true
         prepend apiSchemas = ["MaterialBindingAPI"]

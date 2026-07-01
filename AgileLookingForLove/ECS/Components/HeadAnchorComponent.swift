@@ -14,6 +14,7 @@ public struct HeadAnchorComponent: Component {
     public init() {}
 }
 
+//Arkit must be in main thread
 @MainActor
 public class HeadTracker {
     public static let shared = HeadTracker()

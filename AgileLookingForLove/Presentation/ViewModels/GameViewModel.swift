@@ -55,13 +55,18 @@ final class GameViewModel {
     
     var shapeTemplates: [ShapeKind: Entity] = [:]
     
+    //Leaderboard
+    public let leaderboardRepository: LeaderboardRepository
+    public var leaderboardEntries: [LeaderboardEntry] = []
+    
+    var isHighScoreCandidate: Bool = false
+    var hasSavedHighScore: Bool = false
+    
     func loadTemplates() async {
         do {
             let sphereTemplate = try await Entity(named: "Animation/bundar_walk_anim", in: realityKitContentBundle)
             let cubeTemplate = try await Entity(named: "Animation/kotak_walk_anim", in: realityKitContentBundle)
             let pyramidTemplate = try await Entity(named: "Animation/segitiga_walk_anim", in: realityKitContentBundle)
-            
-             
             
             shapeTemplates[.sphere] = sphereTemplate
             shapeTemplates[.cube] = cubeTemplate
@@ -76,21 +81,26 @@ final class GameViewModel {
     init(
         repository: GameStateRepository,
         generateInstruction: GenerateInstructionUseCase,
-        connectEntities: ConnectEntityUseCase
+        connectEntities: ConnectEntityUseCase,
+        leaderboardRepository: LeaderboardRepository
     ) {
         self.repository = repository
         self.generateInstruction = generateInstruction
         self.connectEntities = connectEntities
+        self.leaderboardRepository = leaderboardRepository
+        self.leaderboardEntries = leaderboardRepository.getTopScores()
     }
     
     convenience init() {
         let repository = InMemoryGameStateRepository()
         let generateInstruction = GenerateInstructionUseCase(repository: repository)
         let connectEntities = ConnectEntityUseCase(repository: repository)
+        let leaderboardRepo = UserDefaultsLeaderboardRepository()
         self.init(
             repository: repository,
             generateInstruction: generateInstruction,
-            connectEntities: connectEntities
+            connectEntities: connectEntities,
+            leaderboardRepository: leaderboardRepo
         )
         refreshInstruction()
     }
@@ -124,7 +134,7 @@ final class GameViewModel {
         if spawnAccumulator >= spawnInterval {
             spawnAccumulator = 0.0
             for _ in 0..<5 {
-            spawnEntity()
+                spawnEntity()
             }
         }
         
@@ -132,20 +142,40 @@ final class GameViewModel {
         gameTimeLeft -= delta
         if gameTimeLeft <= 0 {
             gameTimeLeft = 0
+            
+            // kualifikasi skor masuk top 10
+            isHighScoreCandidate = leaderboardRepository.isTopScore(score)
+            hasSavedHighScore = false
+            
+            leaderboardEntries = leaderboardRepository.getTopScores()
+            
             let isVictory = score >= 400
-            gameState = .gameOver(victory: score >= 400)
+            gameState = .gameOver(victory: isVictory)
             clearPlayingEntities()
             
             if let content = self.content,
-                           let sceneRoot = content.entities.first(where: { $0.name == "SceneRoot" }) {
-                            let sound: AudioManager.SoundEffect = isVictory ? .victory : .defeat
-                            AudioManager.shared.play(sound, on: sceneRoot)
-                        }
+               let sceneRoot = content.entities.first(where: { $0.name == "SceneRoot" }) {
+                let sound: AudioManager.SoundEffect = isVictory ? .victory : .defeat
+                AudioManager.shared.play(sound, on: sceneRoot)
+            }
         }
         
         score = repository.score
     }
+
     
+    func saveHighScore(playerName: String) {
+        guard isHighScoreCandidate, !hasSavedHighScore else { return }
+        let trimmedName = playerName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmedName.isEmpty ? "Player" : trimmedName
+        
+        leaderboardRepository.saveScore(score, playerName: name)
+        leaderboardEntries = leaderboardRepository.getTopScores()
+        hasSavedHighScore = true
+    }
+
+    
+    //make entity Stunned
     func handleShoot(entity: Entity) {
         guard var stateComp = entity.components[EntityStateComponent.self] else { return }
         
@@ -160,6 +190,7 @@ final class GameViewModel {
         AudioManager.shared.play(.stunned, on: entity)
     }
     
+    //Make
     func handleConnect(entity: Entity) {
         guard let stateComp = entity.components[EntityStateComponent.self],
               stateComp.state == .stunned,
@@ -232,6 +263,7 @@ final class GameViewModel {
         
         entity.components.set(InputTargetComponent())
         
+        //Spawn Distance
         let x = Float.random(in: -1.2...1.2)
         let y = Float.random(in: 0.4...0.8)
         let z = Float.random(in: -1.8 ... -1.0)
@@ -252,6 +284,7 @@ final class GameViewModel {
         entity.components[EntityStateComponent.self] = EntityStateComponent()
         
         activeEntities.append(entity)
+        //spawn to ECS
         content.add(entity)
     }
     

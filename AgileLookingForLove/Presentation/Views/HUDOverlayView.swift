@@ -25,7 +25,7 @@ struct HUDOverlayView: View {
                     .shadow(color: .black.opacity(0.8), radius: 8, x: 0, y: 4)
                     .transition(.scale.combined(with: .opacity))
                     .id("countdown_\(count)")
-                    
+                
             case .playing:
                 VStack(spacing: 30) {
                     // Top HUD row: Objective panel on the left, Score Progress bar in the middle, Timer panel on the right
@@ -60,7 +60,7 @@ struct HUDOverlayView: View {
                             .padding(.vertical, 12)
                             .background(
                                 viewModel.lastConnectionMessage.hasPrefix("CORRECT") ?
-                                    AnyShapeStyle(Color.green.opacity(0.85)) :
+                                AnyShapeStyle(Color.green.opacity(0.85)) :
                                     AnyShapeStyle(Color.red.opacity(0.85))
                             )
                             .cornerRadius(16)
@@ -74,7 +74,7 @@ struct HUDOverlayView: View {
                 
             case .gameOver(let victory):
                 // Game Result overlay
-                GameResultCard(victory: victory, score: viewModel.score) {
+                GameResultCard(victory: victory, viewModel: viewModel) {
                     viewModel.startCountdown()
                 } exitAction: {
                     viewModel.exitToMenu()
@@ -273,9 +273,12 @@ struct TimerPanel: View {
 // Game Result Card View
 struct GameResultCard: View {
     let victory: Bool
-    let score: Int
+    let viewModel: GameViewModel
     let restartAction: () -> Void
     let exitAction: () -> Void
+    
+    @Environment(\.openWindow) private var openWindow
+    @State private var playerName: String = ""
     
     var body: some View {
         VStack(spacing: 24) {
@@ -284,10 +287,45 @@ struct GameResultCard: View {
                 .foregroundColor(victory ? .green : .red)
                 .shadow(color: .black.opacity(0.5), radius: 4)
             
-            Text("Your Final Score: \(score)")
+            Text("Your Final Score: \(viewModel.score)")
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
-                .padding(.bottom, 10)
+            
+            // Name entry prompt jika memenuhi kualifikasi Top 10
+            if viewModel.isHighScoreCandidate {
+                VStack(spacing: 12) {
+                    if !viewModel.hasSavedHighScore {
+                        Text("🎉 NEW HIGH SCORE! 🎉")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(.yellow)
+                        
+                        HStack(spacing: 12) {
+                            TextField("Enter your name", text: $playerName)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 250)
+                            
+                            Button {
+                                viewModel.saveHighScore(playerName: playerName)
+                            } label: {
+                                Text("Save")
+                                    .bold()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.green)
+                            .disabled(playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        }
+                    } else {
+                        Text("Score saved successfully as \"\(playerName.isEmpty ? "Player" : playerName)\"!")
+                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                            .foregroundColor(.green)
+                            .padding(.vertical, 4)
+                    }
+                }
+                .padding(16)
+                .background(Color.white.opacity(0.08))
+                .cornerRadius(16)
+                .padding(.bottom, 6)
+            }
             
             HStack(spacing: 20) {
                 Button(action: restartAction) {
@@ -299,6 +337,18 @@ struct GameResultCard: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(.blue)
+                
+                Button(action: {
+                    openWindow(id: "LeaderboardWindow")
+                }) {
+                    Text("Scoreboard")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.bordered)
+                .tint(.yellow)
                 
                 Button(action: exitAction) {
                     Text("Main Menu")
@@ -318,6 +368,6 @@ struct GameResultCard: View {
                 .stroke(Color.white.opacity(0.25), lineWidth: 2)
         )
         .shadow(radius: 15)
-        .frame(width: 480)
+        .frame(width: 580)
     }
 }

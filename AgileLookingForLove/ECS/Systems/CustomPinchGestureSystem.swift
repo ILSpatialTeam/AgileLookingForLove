@@ -12,10 +12,6 @@ import ILSHandTracking
 import ILSSpatialDraw
 import UIKit
 
-extension Notification.Name {
-    static let stunEntityRequested = Notification.Name("stunEntityRequested")
-}
-
 public struct LoveProjectileComponent: Component {
     public var direction: SIMD3<Float>
     public var speed: Float = 3.0
@@ -27,7 +23,8 @@ public struct LoveProjectileComponent: Component {
     }
 }
 
-public struct CustomPinchGestureSystem: System {
+//
+public final class CustomPinchGestureSystem: System {
     static let query = EntityQuery(where: .has(IsDrawingComponent.self) && .has(ILHandAnchorComponent.self) && .has(DrawingComponent.self))
     static var lastShootTime = Date.distantPast
     
@@ -46,6 +43,7 @@ public struct CustomPinchGestureSystem: System {
         var beamDirection = SIMD3<Float>(0, 0, -1)
         
         HeadTracker.shared.update()
+        
         if let headTransform = HeadTracker.shared.lastHeadTransform {
             let zAxis = headTransform.columns.2
             let forwardDir = -SIMD3<Float>(zAxis.x, zAxis.y, zAxis.z)
@@ -91,7 +89,7 @@ public struct CustomPinchGestureSystem: System {
                 }
             }
             
-            // Detect right hand middle-finger drawing pinch
+            // drawing pinch
             if let rightHand = anchorComp.rightHand,
                let rightSkeleton = rightHand.handSkeleton,
                rightHand.isTracked {
@@ -234,6 +232,7 @@ public struct CustomPinchGestureSystem: System {
         }
     }
     
+    //Ini butuh sih untuk headtracking
     private func quaternionFromTo(from: SIMD3<Float>, to: SIMD3<Float>) -> simd_quatf {
         let dot = simd_dot(from, to)
         if dot > 0.9999 {
@@ -248,4 +247,8 @@ public struct CustomPinchGestureSystem: System {
         let cross = simd_cross(from, to)
         return simd_normalize(simd_quatf(ix: cross.x, iy: cross.y, iz: cross.z, r: 1.0 + dot))
     }
+}
+
+extension Notification.Name {
+    static let stunEntityRequested = Notification.Name("stunEntityRequested")
 }
