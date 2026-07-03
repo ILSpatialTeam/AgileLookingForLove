@@ -19,8 +19,8 @@ public final class AudioManager {
     public enum SoundEffect: String, CaseIterable {
         case connect = "cihuy.mp3"
         case minion = "minion.mp3"
-        case laserBeam = "Glimmer.wav"
-        case stunned = "jokowi.mp3"
+        case laserBeam = "glimmer.wav"
+        case stunned = "stun.mp3"
         case victory = "victory.mp3"
         case defeat = "defeat.mp3"
     }

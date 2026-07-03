@@ -9,7 +9,7 @@ import RealityKit
 import UIKit
 
 //okay set everytime system is final class
-final class InstructionSystem: System {
+final class StunTimerSystem: System {
     static let query = EntityQuery(where: .has(EntityStateComponent.self))
     
     required init(scene: Scene) {}

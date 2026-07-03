@@ -368,6 +368,6 @@ struct GameResultCard: View {
                 .stroke(Color.white.opacity(0.25), lineWidth: 2)
         )
         .shadow(radius: 15)
-        .frame(width: 580)
+        .frame(width: 700)
     }
 }

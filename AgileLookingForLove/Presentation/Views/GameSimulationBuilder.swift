@@ -26,13 +26,15 @@ final class GameSimulationBuilder {
     public static func setupSimulation(in content: inout RealityViewContent, viewModel: GameViewModel, attachments: RealityViewAttachments,trackingSession: SpatialTrackingSession) async -> SimulationAnchors {
         
         //ECS System and Components
-        InstructionSystem.registerSystem()
+        StunTimerSystem.registerSystem()
         ThreadSystem.registerSystem()
-        MovementSystem.registerSystem()
+        MonsterAISystem.registerSystem()
+        MovementMonsterSystem.registerSystem()
         ShapeComponent.registerComponent()
         EntityStateComponent.registerComponent()
         ThreadAnchorComponent.registerComponent()
-        OriginalMaterialsComponent.registerComponent()
+        DrawingStateComponent.registerComponent()
+        //OriginalMaterialsComp onent.registerComponent()
         RedThreadValidationSystem.registerSystem()
         MergeAnimationComponent.registerComponent()
         MergeAnimationSystem.registerSystem()
@@ -49,7 +51,12 @@ final class GameSimulationBuilder {
         CanvasComponent.registerComponent()
         SharePlayReceiverComponent.registerComponent()
         
+        //CustomPinchGestureSystem.registerSystem()
+        
         CustomPinchGestureSystem.registerSystem()
+        HandGestureInputSystem.registerSystem()
+        LoveBeamSFXSystem.registerSystem()
+        LoveProjectileSystem.registerSystem()
         CustomDrawingSystem.registerSystem()
         
         // Canvas setup
@@ -69,6 +76,8 @@ final class GameSimulationBuilder {
         
         drawController.components.set(IsDrawingComponent())
         drawController.components.set(ILHandAnchorComponent())
+        drawController.components.set(HeartGestureComponent())
+        drawController.components.set(DrawingStateComponent())
         content.add(drawController)
         
         // Setup Entity

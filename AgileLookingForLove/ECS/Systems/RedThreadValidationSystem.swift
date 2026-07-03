@@ -11,82 +11,65 @@ import Foundation
 import ILSSpatialAudio
 
 final class RedThreadValidationSystem: System {
-    static let drawQuery  = EntityQuery(where: .has(DrawingComponent.self) && .has(IsDrawingComponent.self))
+    static let drawQuery  = EntityQuery(where: .has(DrawingComponent.self) && .has(IsDrawingComponent.self) && .has(DrawingStateComponent.self))
     static let shapeQuery = EntityQuery(where: .has(ShapeComponent.self) && .has(EntityStateComponent.self))
-    private var wasDrawing: Bool = false
-    private var cachedStrokePoints: [SIMD3<Float>] = []
-    private var cachedStrokeEntity: Entity? = nil
     
     required init(scene: Scene) {
     }
+    
     func update(context: SceneUpdateContext) {
-        // print periodically to verify the system is running
-        if Int.random(in: 1...300) == 1 {
-            print("[RedThreadValidationSystem] System is updating...")
-        }
-
         // Ambil draw controller entity
-        guard let drawer = context.entities(matching: Self.drawQuery, updatingSystemWhen: .rendering)
-            .first(where: { _ in true }),
+        guard let drawer = context.entities(matching: Self.drawQuery, updatingSystemWhen: .rendering).first(where: { _ in true }),
               let isDrawing = drawer.components[IsDrawingComponent.self],
-              let drawComp  = drawer.components[DrawingComponent.self]
-        else { 
-            if Int.random(in: 1...300) == 1 {
-                print("[RedThreadValidationSystem] DrawController not found in scene.")
-            }
-            return 
-        }
+              let drawComp  = drawer.components[DrawingComponent.self],
+              var stateDrawComp = drawer.components[DrawingStateComponent.self]
+        else { return }
+        
         let isCurrentlyDrawing = isDrawing.isActive
         
         if isCurrentlyDrawing {
-            cachedStrokePoints = drawComp.activeStrokePoints
-            cachedStrokeEntity = drawComp.activeStrokeEntity
-            if Int.random(in: 1...60) == 1 {
-                print("[RedThreadValidationSystem] User is drawing. Cached points count: \(cachedStrokePoints.count)")
-            }
+            stateDrawComp.cachedStrokePoints = drawComp.activeStrokePoints
+            stateDrawComp.cachedStrokeEntity = drawComp.activeStrokeEntity
         }
         
-        // Deteksi momen BERHENTI drawing (stroke just ended)
-        if wasDrawing && !isCurrentlyDrawing {
-            let strokePoints = cachedStrokePoints
-            let strokeEntity = cachedStrokeEntity
-            cachedStrokePoints = []
-            cachedStrokeEntity = nil
+        // Deteksi momen BERHENTI menggambar benang
+        if stateDrawComp.wasDrawing && !isCurrentlyDrawing {
+            let strokePoints = stateDrawComp.cachedStrokePoints
+            let strokeEntity = stateDrawComp.cachedStrokeEntity
+            
+            // Reset status pada komponen data
+            stateDrawComp.cachedStrokePoints = []
+            stateDrawComp.cachedStrokeEntity = nil
             
             print("[RedThreadValidationSystem] Stroke ended! Points count: \(strokePoints.count)")
             
             guard strokePoints.count >= 2 else {
                 print("[RedThreadValidationSystem] Stroke points count < 2. Ignoring.")
                 strokeEntity?.removeFromParent()
-                wasDrawing = isCurrentlyDrawing
+                stateDrawComp.wasDrawing = isCurrentlyDrawing
+                drawer.components[DrawingStateComponent.self] = stateDrawComp
                 return
             }
+            
             let startPoint = strokePoints.first!
             let endPoint   = strokePoints.last!
-            
-            print("[RedThreadValidationSystem] Start point: \(startPoint), End point: \(endPoint)")
             
             // Cari entity stunned yang paling dekat dengan ujung-ujung stroke
             let shapes = context.entities(matching: Self.shapeQuery, updatingSystemWhen: .rendering)
             var startEntity: Entity? = nil
             var endEntity:   Entity? = nil
-            var minStartDist: Float = 0.80   // max jarak 80cm dari ujung stroke
+            var minStartDist: Float = 0.80   // max jarak 80cm
             var minEndDist:   Float = 0.80
             
             let shapeArray = Array(shapes)
-            print("[RedThreadValidationSystem] Found \(shapeArray.count) shapes in scene.")
             
             for shape in shapeArray {
                 guard let stateComp = shape.components[EntityStateComponent.self] else { continue }
-                
                 guard stateComp.state == .stunned else { continue }
                 
-                // Use the actual position of the shape in world space
                 let visualCenter = shape.visualBounds(relativeTo: nil).center
                 let dStart = simd_distance(visualCenter, startPoint)
                 let dEnd   = simd_distance(visualCenter, endPoint)
-                
-                print("[RedThreadValidationSystem] Shape: \(shape.name), Position: \(shape.position(relativeTo: nil)), VisualCenter: \(visualCenter), StartDist=\(dStart)m, EndDist=\(dEnd)m")
                 
                 if dStart < minStartDist {
                     minStartDist = dStart
@@ -99,7 +82,6 @@ final class RedThreadValidationSystem: System {
             }
             
             if let a = startEntity, let b = endEntity {
-                print("[RedThreadValidationSystem] Selected: A=\(a.name) (dist \(minStartDist)), B=\(b.name) (dist \(minEndDist))")
                 if a.id != b.id {
                     print("[RedThreadValidationSystem] Posting threadStrokeConnected notification!")
                     NotificationCenter.default.post(
@@ -112,15 +94,15 @@ final class RedThreadValidationSystem: System {
                         ]
                     )
                 } else {
-                    print("[RedThreadValidationSystem] Start and End matched the SAME entity.")
                     strokeEntity?.removeFromParent()
                 }
             } else {
-                print("[RedThreadValidationSystem] No shapes were within proximity threshold.")
                 strokeEntity?.removeFromParent()
             }
         }
-        wasDrawing = isCurrentlyDrawing
+        
+        stateDrawComp.wasDrawing = isCurrentlyDrawing
+        drawer.components[DrawingStateComponent.self] = stateDrawComp
     }
 }
 
